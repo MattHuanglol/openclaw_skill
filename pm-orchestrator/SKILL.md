@@ -59,19 +59,16 @@ openclaw system event --text "claude done: Spec Gen" --mode now
 PM delegates to Claude:
 ```bash
 claude -p "Implement..." --output-format json && \
-openclaw message send --target 894437982 --message $'🔔 任務完成回報 (Auto-Reply)\n\n**狀態**：實作完成\n請主人驗收！'
+openclaw system event --text "claude done: Implementation <feature>" --mode now
 ```
 *(Agent goes to sleep and waits for Wake Event)*
 
 ### Phase 6: Verification & Delivery
 **Trigger**: System Event "claude done".
 1.  **Wake Up**: Check the result log.
-2.  **Smoke Test**: Run a quick verification (build/curl/test).
-3.  **Kanban Sync**:
-    - Mark all implemented subtasks as `done`.
-    - Update task status to `Review`.
-    - Add a discussion comment summarizing the work.
-4.  **Report**: `message action=send` using the **Reporting Template** below.
+2.  **Smoke Test**: Run a quick verification.
+3.  **Kanban Sync**: Mark done, update status.
+4.  **Report**: **MUST** use `message` tool to notify user (do not stay silent).
 
 ## ⚠️ Global Rules
 1.  **No Direct Coding**: Always delegate implementation to `claude-code`.
