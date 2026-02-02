@@ -28,29 +28,25 @@ This skill defines the high-level workflow for software development tasks, enfor
     - `message action=send`: "🚀 開始執行任務：[Title] (UUID)"
 
 ### Phase 2: Progress Monitoring (Heartbeat)
-**Trigger**: Periodic Kanban Check (e.g., every 10m).
+**Trigger**: Periodic Kanban Check (e.g., every 5m).
 1.  **Check In-Progress**: Are there tasks in `In-Progress`?
-2.  **Check Sub-agents**: Use `process action=list` or `sessions_list` to see if `claude` is still running.
+2.  **Check Sub-agents**: Use `process action=list` to see if `claude` is still running.
 3.  **Action**:
     - **Stuck**: If no output for >10m, kill and respawn/notify.
-    - **Healthy**: Do nothing (or update discussion if milestone reached).
-
-### Phase 3: Requirement & Proposal (OpenSpec)
-1.  **Init**: `openspec new <feature-name>` (if new).
-2.  **Draft**: PM writes `openspec/changes/<feature>/proposal.md`.
-    - Define clear DoD (Definition of Done).
+    - **Healthy**: Do nothing.
 
 ### Phase 3: Spec Generation (Delegate to Claude)
 PM delegates to Claude:
 ```bash
-claude -p "Read proposal.md..." --output-format json && \
-openclaw system event --text "claude done: Spec Gen" --mode now
+claude -p "Read proposal.md. Generate full specs (specs/*.md), design.md, and tasks.md following OpenSpec conventions." --output-format json && \
+openclaw sessions send --agent main --message "claude done: Spec Gen"
 ```
 
 ### Phase 4: Spec Review & Auto-Implement (PM Gate)
-**Trigger**: System Event "claude done: Spec Gen".
-1.  **Review**: Read generated specs.
-2.  **Decision**:
+**Trigger**: Incoming message "claude done: Spec Gen".
+1.  **Wake Up**: PM wakes up upon receiving the message.
+2.  **Review**: Read generated specs.
+3.  **Decision**:
     -   If valid: **Auto-Proceed** to Phase 5.
     -   Report: "Specs generated & approved. Starting implementation..."
     -   If invalid: Stop and report issues.
@@ -58,23 +54,26 @@ openclaw system event --text "claude done: Spec Gen" --mode now
 ### Phase 5: Implementation (Delegate to Claude)
 PM delegates to Claude:
 ```bash
-claude -p "Implement..." --output-format json && \
-openclaw system event --text "claude done: Implementation <feature>" --mode now
+claude -p "Implement the approved tasks defined in openspec/changes/<feature>/tasks.md. Update checklist as you go." --output-format json && \
+openclaw sessions send --agent main --message "claude done: Implementation <feature>"
 ```
-*(Agent goes to sleep and waits for Wake Event)*
+*(Agent goes to sleep and waits for this internal message)*
 
 ### Phase 6: Verification & Delivery
-**Trigger**: System Event "claude done".
+**Trigger**: Incoming message "claude done: Implementation".
 1.  **Wake Up**: Check the result log.
-2.  **Smoke Test**: Run a quick verification.
-3.  **Kanban Sync**: Mark done, update status.
-4.  **Report**: **MUST** use `message` tool to notify user (do not stay silent).
+2.  **Smoke Test**: Run a quick verification (build/curl/test).
+3.  **Kanban Sync**:
+    - Mark all implemented subtasks as `done`.
+    - Update task status to `Review`.
+    - Add a discussion comment summarizing the work.
+4.  **Report**: `message action=send` using the **Reporting Template** below.
 
 ## ⚠️ Global Rules
 1.  **No Direct Coding**: Always delegate implementation to `claude-code`.
 2.  **No Git Push**: Unless explicitly instructed.
 3.  **Always Update Kanban**: Status MUST reflect reality (Todo -> In-Progress -> Review).
-4.  **Wake Event**: Always use `openclaw system event` for long background tasks.
+4.  **Wake Event**: Always use `openclaw sessions send` to ensure the Main Agent wakes up.
 
 ## 📝 Reporting Template
 🚀 **任務交付報告 (Task Delivery)**
