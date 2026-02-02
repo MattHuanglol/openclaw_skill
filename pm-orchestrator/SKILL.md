@@ -64,10 +64,26 @@ openclaw system event --text "claude done: Implementation <feature>" --mode now
     - Mark all implemented subtasks as `done`.
     - Update task status to `Review`.
     - Add a discussion comment summarizing the work.
-4.  **Report**: `message action=send` with the Result + Acceptance Checklist.
+4.  **Report**: `message action=send` using the **Reporting Template** below.
 
 ## ⚠️ Global Rules
 1.  **No Direct Coding**: Always delegate implementation to `claude-code`.
 2.  **No Git Push**: Unless explicitly instructed.
 3.  **Always Update Kanban**: Status MUST reflect reality (Todo -> In-Progress -> Review).
 4.  **Wake Event**: Always use `openclaw system event` for long background tasks.
+
+## 📝 Reporting Template
+🚀 **任務交付報告 (Task Delivery)**
+
+📌 **任務**：#[Seq] [Title]
+🔄 **階段**：Phase 6 - Verification & Delivery
+
+📝 **變更摘要**：
+- [UI/Logic] ...
+- [Fix] ...
+
+✅ **驗收清單 (Acceptance Checklist)**：
+- [ ] ...
+- [ ] ...
+
+📊 **看板狀態**：Review
