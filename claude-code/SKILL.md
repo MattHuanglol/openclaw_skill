@@ -18,16 +18,15 @@ This skill integrates the official `claude` CLI tool into OpenClaw, allowing you
 Use the `-p` (prompt) flag to execute a task and exit. This is the preferred method for OpenClaw automation.
 
 ```bash
-# Basic usage
-claude -p "Refactor src/utils.js to use arrow functions"
-
-# Auto-approve (YOLO mode) - WARNING: Risks applying changes without review
-claude -p "Fix the lint errors in app.tsx" --dangerously-skip-permissions
+# Best Practice: JSON output + Auto-approve
+# Wait for the JSON response before proceeding.
+claude -p "Refactor src/utils.js" --dangerously-skip-permissions --output-format json
 ```
 
 **Tips:**
 - Always be specific about file paths.
-- Combine with `--dangerously-skip-permissions` if you want the agent to edit files without asking (use with caution).
+- Combine with `--dangerously-skip-permissions` to bypass prompts.
+- Use `--output-format json` to get machine-readable results (success/failure).
 
 ### 2. Interactive Session
 Start a persistent session to discuss code or run multiple steps.
@@ -39,6 +38,16 @@ exec({ command: "claude", pty: true });
 // Send commands
 process({ action: "write", data: "/bug Fix the crash in main.rs\n" });
 ```
+
+### 3. Background Task with Auto-Notification (Recommended)
+For long-running tasks, chain a system event to wake the agent upon completion.
+
+```bash
+claude -p "Refactor db.js" --output-format json && \
+openclaw system event --text "claude done: Refactor db.js" --mode now
+```
+
+**Why?** This ensures the agent wakes up immediately to process the result.
 
 ## ⚙️ Configuration
 
