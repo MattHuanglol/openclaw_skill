@@ -43,24 +43,23 @@ This skill defines the high-level workflow for software development tasks, enfor
 ### Phase 3: Spec Generation (Delegate to Claude)
 PM delegates to Claude:
 ```bash
-claude -p "Read proposal.md. Generate full specs (specs/*.md), design.md, and tasks.md following OpenSpec conventions." --output-format json
+claude -p "Read proposal.md..." --output-format json && \
+openclaw system event --text "claude done: Spec Gen" --mode now
 ```
 
-### Phase 4: Spec Review (PM Gate)
-**CRITICAL STEP**: PM must read the generated files.
-1.  Read `openspec/changes/<feature>/specs/*.md` & `tasks.md`.
-2.  **Evaluate**:
-    - Does it cover all requirements?
-    - Are edge cases considered?
-3.  **Decision**:
-    - ❌ **Reject**: Command Claude to revise.
-    - ✅ **Approve**: Proceed to Phase 5.
+### Phase 4: Spec Review & Auto-Implement (PM Gate)
+**Trigger**: System Event "claude done: Spec Gen".
+1.  **Review**: Read generated specs.
+2.  **Decision**:
+    -   If valid: **Auto-Proceed** to Phase 5.
+    -   Report: "Specs generated & approved. Starting implementation..."
+    -   If invalid: Stop and report issues.
 
 ### Phase 5: Implementation (Delegate to Claude)
 PM delegates to Claude:
 ```bash
-claude -p "Implement the approved tasks defined in openspec/changes/<feature>/tasks.md. Update checklist as you go." --output-format json && \
-openclaw system event --text "claude done: Implementation <feature>" --mode now
+claude -p "Implement..." --output-format json && \
+openclaw message send --target 894437982 --message $'🔔 任務完成回報 (Auto-Reply)\n\n**狀態**：實作完成\n請主人驗收！'
 ```
 *(Agent goes to sleep and waits for Wake Event)*
 
