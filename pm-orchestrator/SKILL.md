@@ -27,7 +27,15 @@ This skill defines the high-level workflow for software development tasks, enfor
     - Move task to `In-Progress`.
     - `message action=send`: "🚀 開始執行任務：[Title] (UUID)"
 
-### Phase 2: Requirement & Proposal (OpenSpec)
+### Phase 2: Progress Monitoring (Heartbeat)
+**Trigger**: Periodic Kanban Check (e.g., every 10m).
+1.  **Check In-Progress**: Are there tasks in `In-Progress`?
+2.  **Check Sub-agents**: Use `process action=list` or `sessions_list` to see if `claude` is still running.
+3.  **Action**:
+    - **Stuck**: If no output for >10m, kill and respawn/notify.
+    - **Healthy**: Do nothing (or update discussion if milestone reached).
+
+### Phase 3: Requirement & Proposal (OpenSpec)
 1.  **Init**: `openspec new <feature-name>` (if new).
 2.  **Draft**: PM writes `openspec/changes/<feature>/proposal.md`.
     - Define clear DoD (Definition of Done).
