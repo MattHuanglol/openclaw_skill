@@ -54,6 +54,32 @@ openclaw system event --text "claude done: Refactor db.js" --mode now
 - **Compact Mode**: Use `--compact` to reduce output noise.
 - **Verbose**: Use `--verbose` for debugging.
 
+## 🏗 Spec-Driven Workflow (OpenSpec)
+
+Use [OpenSpec](https://github.com/Fission-AI/OpenSpec) to plan changes before coding.
+
+### Setup
+`npm install -g @fission-ai/openspec`
+
+### Workflow
+1. **Initialize** (Once per project):
+   ```bash
+   cd project-root && openspec init
+   ```
+2. **New Feature**:
+   ```bash
+   openspec new <feature-name>
+   # This creates openspec/changes/<feature-name>/ with templates
+   ```
+3. **Plan**:
+   ```bash
+   claude -p "Read openspec/changes/<feature-name>/proposal.md. Fill in the details, then generate specs/requirements.md and tasks.md based on it." --output-format json
+   ```
+4. **Implement**:
+   ```bash
+   claude -p "Read openspec/changes/<feature-name>/tasks.md. Implement the tasks one by one. Update the checklist in tasks.md as you go." --output-format json
+   ```
+
 ## 📋 Example Workflow
 
 1.  **Read Context**: The agent reads files.
