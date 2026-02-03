@@ -56,3 +56,32 @@ Parse the JSON and check for:
 
 ## 🤖 Usage (Cron Payload)
 The Cron Job should simply instruct the agent to "Follow the `kanban-patrol` skill."
+
+---
+
+## 🧩 Kanban Dev Monitor (Event-driven, 5m)
+
+Owner requirements:
+- **Every 5 minutes**
+- Model: `google-gemini-cli/gemini-3-flash-preview`
+- **Notify only on events / stuck / finished** (no periodic "still running" spam)
+- **Long no-response (stuck) threshold: 30 minutes**
+- Persist snapshots to: `/home/matt/clawd/memory/kanban-monitor-state.json`
+- Monitor uses task discussion as the canonical place to record run state when needed; monitor itself only wakes PM.
+
+Current cron job (active):
+- **Job name**: Kanban Dev Monitor (5m, event-driven)
+- **Job id**: `b4b8b75e-b024-4946-ab12-a5d5179a1a6c`
+
+### Script implementation (preferred)
+A deterministic implementation lives here:
+- `scripts/kanban_dev_monitor.js`
+
+It can be executed with:
+```bash
+node /home/matt/clawd/skills/custom/kanban-patrol/scripts/kanban_dev_monitor.js
+```
+
+Notes:
+- Script sends alerts to main via: `openclaw sessions send --agent main --message ...`
+- Script does **not** message the user directly.
