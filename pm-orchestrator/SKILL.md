@@ -21,6 +21,7 @@ This skill defines the high-level workflow for software development tasks, enfor
 - **Claude (Engineer)**:
   - **Planner**: Generates Specs/Design/Tasks based on Proposal.
   - **Coder**: Implements code using the `claude` CLI.
+  - **Hard Requirement**: In PM mode, all implementation work must be delegated via the **claude-code skill** (i.e., `claude` CLI). PM does not directly implement application code unless the USER explicitly requests otherwise.
 
 ## 🔄 Execution Loop & Workflow
 
@@ -76,6 +77,34 @@ openclaw agent --id main --message "claude done: Implementation <feature>"
 4.  **Report**: `message action=send` using the **Reporting Template** below.
 
 ## ♾️ The Automation Loop
+
+## 👀 Monitoring (Multi-Task, Event-Driven)
+
+### Goal
+- Support **multiple concurrent In-Progress tasks**.
+- Run **periodic monitoring every 5 minutes**.
+- **Notify only on events**: status change, stuck, finished, or service down.
+
+### Source of Truth
+- Use **Project Kanban task discussions** to record run state (run id / phase / timestamps).
+
+### Recommended Monitor Runner
+- Use a **Cron job** running with model: `google-gemini-cli/gemini-3-flash-preview`.
+- The monitor job should:
+  1) Check Kanban server health (e.g. `GET /api/tasks`).
+  2) List all tasks in `in-progress` (optionally assignee=妲己).
+  3) For each task, compare current `status/version/updatedAt/open subtasks` with last snapshot.
+  4) Detect **stuck** (no `updatedAt` change for N minutes, default 30m) or missing expected process.
+  5) On event, **wake PM (main agent)** via `sessions_send` with a concise alert and recommended action.
+
+### Long No-Response Handling (PM-owned)
+- In PM mode, the monitor may flag **long no-response** (e.g., no progress/logs for >= 30m).
+- After wake, **PM decides** what to do (re-run phase, restart services, request clarification, etc.).
+- The monitor should not take high-risk corrective actions by itself unless explicitly authorized.
+
+### Noise Policy
+- Do **not** send periodic “still running” updates.
+- Only alert when something changes or needs attention.
 
 This section defines the interaction between PM Agent, Claude, and the Patrol.
 
