@@ -53,9 +53,10 @@ openclaw sessions send --agent main --message "claude done: Spec Gen"
     -   If invalid: Stop and report issues.
 
 ### Phase 5: Implementation (Delegate to Claude)
-PM delegates to Claude:
+PM delegates to Claude (Dual Notification):
 ```bash
 claude -p "Implement the approved tasks defined in openspec/changes/<feature>/tasks.md. Update checklist as you go." --output-format json && \
+openclaw message send --target 894437982 --message "🔔 Claude Task Finished! Verifying..." && \
 openclaw sessions send --agent main --message "claude done: Implementation <feature>"
 ```
 *(Agent goes to sleep and waits for this internal message)*
@@ -78,7 +79,7 @@ This section defines the interaction between PM Agent, Claude, and the Patrol.
 - **Trigger**: User adds task or PM picks `Todo`.
 - **Action**: 
   - Move to `In-Progress`.
-  - Enable Patrol: `openclaw cron enable --id c7438563-e00f-40f0-b7cb-6468e96efef7`
+  - Enable Patrol: `openclaw cron enable --id ...`
   - Start Claude (Phase 2/5).
 
 ### 2. 🛡️ Monitoring (Patrol)
@@ -91,8 +92,8 @@ This section defines the interaction between PM Agent, Claude, and the Patrol.
 - **On "Stuck"**: Check process. If dead, **Resume** task.
 
 ### 4. 🎉 Completion
-- **Trigger**: Claude finishes -> `sessions_send` to PM.
-- **Action**: PM Verifies -> PM Updates Kanban (Review) -> PM Notifies User (`message`).
+- **Trigger**: Claude finishes -> `message` (User) + `sessions_send` (PM).
+- **Action**: PM Verifies -> PM Updates Kanban (Review) -> PM Notifies User (Final Report).
 
 ### 5. 🛑 Stop
 - **Trigger**: User moves to `Done`.
