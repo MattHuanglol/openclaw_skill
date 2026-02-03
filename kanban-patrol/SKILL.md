@@ -74,12 +74,12 @@ Current cron job (active):
 - **Job id**: `b4b8b75e-b024-4946-ab12-a5d5179a1a6c`
 
 ### Script implementation (preferred)
-A deterministic implementation lives here:
-- `scripts/kanban_dev_monitor.js`
+A deterministic implementation lives in the dedicated skill:
+- `/home/matt/clawd/skills/custom/kanban-dev-monitor/scripts/kanban_dev_monitor.js`
 
-It can be executed with:
+Run:
 ```bash
-node /home/matt/clawd/skills/custom/kanban-patrol/scripts/kanban_dev_monitor.js
+node /home/matt/clawd/skills/custom/kanban-dev-monitor/scripts/kanban_dev_monitor.js
 ```
 
 Notes:
