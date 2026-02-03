@@ -5,6 +5,10 @@ description: Project management orchestrator for software development. Use when 
 
 # PM Orchestrator (Spec-Driven + Kanban Auto)
 
+## 🔗 Project Kanban Links
+- **Local**: http://localhost:3001/
+- **Tailscale / LAN**: http://100.96.208.119:3001/
+
 This skill defines the high-level workflow for software development tasks, enforcing a **Review-First** approach using OpenSpec and strict Kanban synchronization.
 
 ## 🎭 Roles
@@ -103,7 +107,8 @@ This section defines the interaction between PM Agent, Claude, and the Patrol.
 1.  **No Direct Coding**: Always delegate implementation to `claude-code`.
 2.  **No Git Push**: Unless explicitly instructed.
 3.  **Always Update Kanban**: Status MUST reflect reality (Todo -> In-Progress -> Review).
-4.  **Wake Event**: Always use `openclaw agent --id main --message` to wake up.
+4.  **Auto-Proceed After User Approval**: Once the USER explicitly confirms “開始開發 / OK 開發 / 做吧”等同意開發的指令後，若未另行要求，**不需要再逐步詢問確認**（例如 Spec Review 後、開工前、每一步前）。PM 應直接依流程推進到完成（到 `Review` 階段並回報）。只有在遇到重大不確定性/風險（需求衝突、資料毀損風險、需對外行為、或可能破壞既有功能）時才中途詢問。
+5.  **Wake Event**: Always use `openclaw agent --id main --message` to wake up.
 
 ## 📝 Reporting Template
 🚀 **任務交付報告 (Task Delivery)**
