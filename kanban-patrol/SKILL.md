@@ -38,9 +38,12 @@ Parse the JSON and check for:
   - If tasks exist: Only report **CRITICAL** (Stuck).
 
 - **Active Hours (08:00 - 23:59)**:
-  - If tasks exist: Report Stuck status only.
+  - If tasks exist: Report Stuck status.
+  - **Running Check**: If active sessions found, notify Main Agent AND User ("✅ Patrol: Task #[Seq] is running...").
 
 ### 4. Notification Channels
+- **To User**: Use `message` tool (Telegram).
+- **To Main Agent**: Use `sessions_send`.
 - **To Main Agent (Wake Up)**: If actionable items found (Stuck), wake the main agent.
   - Tool: `sessions_send`
   - Target: `agent:main:main`
