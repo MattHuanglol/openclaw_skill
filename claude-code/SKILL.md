@@ -15,36 +15,36 @@ This skill integrates the official `claude` CLI tool into OpenClaw, allowing you
 ## 🚀 Usage Patterns
 
 ### 1. Single-Shot Task (Best for Agents)
-Use the `-p` (prompt) flag to execute a task and exit. This is the preferred method for OpenClaw automation.
+Use the wrapper script `claude_code_run.py` to ensure TTY allocation (prevents hanging).
 
 ```bash
-# Best Practice: JSON output + Auto-approve
-# Wait for the JSON response before proceeding.
-claude -p "Refactor src/utils.js" --dangerously-skip-permissions --output-format json
+# Path to wrapper
+WRAPPER="/home/matt/clawd/skills/custom/claude-code/scripts/claude_code_run.py"
+
+# Usage
+python3 $WRAPPER -p "Refactor src/utils.js" --dangerously-skip-permissions --output-format json
 ```
 
-**Tips:**
-- Always be specific about file paths.
-- Combine with `--dangerously-skip-permissions` to bypass prompts.
-- Use `--output-format json` to get machine-readable results (success/failure).
+**Workflow:**
+1. Run the command.
+2. **Wait** for the JSON response.
 
 ### 2. Interactive Session
-Start a persistent session to discuss code or run multiple steps.
+Start a persistent session.
 
 ```javascript
 // Start the session (must use pty=true)
 exec({ command: "claude", pty: true });
-
-// Send commands
-process({ action: "write", data: "/bug Fix the crash in main.rs\n" });
 ```
+(Wrapper not needed for interactive exec with pty:true, as exec provides PTY).
 
 ### 3. Background Task with Auto-Notification (Recommended)
-For long-running tasks, chain a system event to wake the agent upon completion.
+For long-running tasks, chain a system event.
 
 ```bash
-claude -p "Refactor db.js" --output-format json && \
-openclaw system event --text "claude done: Refactor db.js" --mode now
+WRAPPER="/home/matt/clawd/skills/custom/claude-code/scripts/claude_code_run.py"
+python3 $WRAPPER -p "Refactor db.js" --output-format json && \
+openclaw sessions send --agent main --message "claude done: Refactor db.js"
 ```
 
 **Why?** This ensures the agent wakes up immediately to process the result.
