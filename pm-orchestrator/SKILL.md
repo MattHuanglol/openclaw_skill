@@ -78,7 +78,7 @@ This section defines the interaction between PM Agent, Claude, and the Patrol.
 - **Trigger**: User adds task or PM picks `Todo`.
 - **Action**: 
   - Move to `In-Progress`.
-  - Enable Patrol: `openclaw cron enable --id ...`
+  - Enable Patrol: `openclaw cron enable --id c7438563-e00f-40f0-b7cb-6468e96efef7`
   - Start Claude (Phase 2/5).
 
 ### 2. 🛡️ Monitoring (Patrol)
