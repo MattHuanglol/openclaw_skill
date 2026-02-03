@@ -20,7 +20,7 @@ curl -sS http://127.0.0.1:3001/api/tasks
 ### 2. Analyze
 Parse the JSON and check for:
 - **STUCK**: Tasks in `in-progress` not updated for > 1 hour.
-- **IGNORE**: Tasks in `todo`, `done`, `on-hold`, `review`.
+- **IGNORE**: Tasks in `todo`, `done`, `on-hold`.
 
 ### 2.5 Check Background Agents (Safety Net)
 - Run `openclaw sessions --json --active 30`.
@@ -39,15 +39,20 @@ Parse the JSON and check for:
 
 - **Active Hours (08:00 - 23:59)**:
   - If tasks exist: Report Stuck status.
-  - **Running Check**: If active sessions found, notify Main Agent AND User ("✅ Patrol: Task #[Seq] is running...").
+  - **Running Check**: If active sessions found, notify Main Agent AND User.
 
 ### 4. Notification Channels
-- **To User**: Use `message` tool (Telegram).
-- **To Main Agent**: Use `sessions_send`.
-- **To Main Agent (Wake Up)**: If actionable items found (Stuck), wake the main agent.
+- **To Main Agent (Wake Up)**:
   - Tool: `sessions_send`
   - Target: `agent:main:main`
-  - Message: `🚨 PM Patrol: Task #[Seq] is stuck...`
+  - Message: `🚨 PM Patrol: Task #[Seq] is stuck...` or `✅ Running...`
+- **To User (Notification)**:
+  - Tool: `message`
+  - Channel: `telegram`
+  - Message Format:
+    - Review: `🔔 Task #[Seq] is waiting for review.`
+    - Stuck/Action: `🚨 Task #[Seq] stuck. ℹ️ 已通知主代理人 (妲己) 接手處理。`
+    - Running: `✅ Task #[Seq] is running. ℹ️ 已通知主代理人監控中。`
 
 ## 🤖 Usage (Cron Payload)
 The Cron Job should simply instruct the agent to "Follow the `kanban-patrol` skill."
