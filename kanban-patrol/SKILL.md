@@ -23,13 +23,18 @@ Parse the JSON and check for:
 - **REVIEW**: Tasks in `review`.
 - **IGNORE**: Tasks in `todo`, `done`, `on-hold`.
 
-### 3. Action Rules (Quiet Hours)
-Check current time (Asia/Taipei).
-- **00:00 - 08:00 (Sleep Mode)**:
-  - Only report **CRITICAL** issues (Stuck tasks).
-  - Suppress "Waiting for Review" notifications.
-- **08:00 - 23:59 (Active Mode)**:
-  - Report all issues.
+### 3. Action Rules (Logic)
+- **Auto-Stop Logic**:
+  - If `count(in-progress) == 0` AND `count(review) == 0`:
+    - **Disable Cron**: `openclaw cron disable --id c7438563-e00f-40f0-b7cb-6468e96efef7`
+    - **Notify**: "💤 All tasks cleared. Patrol entering deep sleep."
+    - **Exit**.
+
+- **Quiet Hours (00:00 - 08:00)**:
+  - If tasks exist: Only report **CRITICAL** (Stuck). Suppress Review notifications.
+
+- **Active Hours (08:00 - 23:59)**:
+  - If tasks exist: Report Review / Stuck status.
 
 ### 4. Notification Channels
 - **To Main Agent (Wake Up)**: If actionable items found (Stuck), wake the main agent.
