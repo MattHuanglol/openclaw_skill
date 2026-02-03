@@ -20,31 +20,26 @@ curl -sS http://127.0.0.1:3001/api/tasks
 ### 2. Analyze
 Parse the JSON and check for:
 - **STUCK**: Tasks in `in-progress` not updated for > 1 hour.
-- **REVIEW**: Tasks in `review`.
-- **IGNORE**: Tasks in `todo`, `done`, `on-hold`.
+- **IGNORE**: Tasks in `todo`, `done`, `on-hold`, `review` (User requested to ignore Review).
 
 ### 3. Action Rules (Logic)
 - **Auto-Stop Logic**:
-  - If `count(in-progress) == 0` AND `count(review) == 0`:
+  - If `count(in-progress) == 0`:
     - **Disable Cron**: `openclaw cron disable --id c7438563-e00f-40f0-b7cb-6468e96efef7`
-    - **Notify**: "💤 All tasks cleared. Patrol entering deep sleep."
+    - **Notify**: "💤 No active development tasks. Patrol entering deep sleep."
     - **Exit**.
 
 - **Quiet Hours (00:00 - 08:00)**:
-  - If tasks exist: Only report **CRITICAL** (Stuck). Suppress Review notifications.
+  - If tasks exist: Only report **CRITICAL** (Stuck).
 
 - **Active Hours (08:00 - 23:59)**:
-  - If tasks exist: Report Review / Stuck status.
+  - If tasks exist: Report Stuck status only.
 
 ### 4. Notification Channels
 - **To Main Agent (Wake Up)**: If actionable items found (Stuck), wake the main agent.
   - Tool: `sessions_send`
   - Target: `agent:main:main`
   - Message: `🚨 PM Patrol: Task #[Seq] is stuck...`
-- **To User (Notification)**: If Review items found (and active hours), notify user.
-  - Tool: `message`
-  - Channel: `telegram`
-  - Message: `🔔 Task #[Seq] is waiting for review.`
 
 ## 🤖 Usage (Cron Payload)
 The Cron Job should simply instruct the agent to "Follow the `kanban-patrol` skill."
