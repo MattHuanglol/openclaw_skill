@@ -20,7 +20,12 @@ curl -sS http://127.0.0.1:3001/api/tasks
 ### 2. Analyze
 Parse the JSON and check for:
 - **STUCK**: Tasks in `in-progress` not updated for > 1 hour.
-- **IGNORE**: Tasks in `todo`, `done`, `on-hold`, `review` (User requested to ignore Review).
+- **IGNORE**: Tasks in `todo`, `done`, `on-hold`, `review`.
+
+### 2.5 Check Background Agents (Safety Net)
+- Run `openclaw sessions --json --active 30`.
+- Look for sessions with `model` like `claude` that stopped recently.
+- If found (and looks like a task): Notify Main Agent.
 
 ### 3. Action Rules (Logic)
 - **Auto-Stop Logic**:
