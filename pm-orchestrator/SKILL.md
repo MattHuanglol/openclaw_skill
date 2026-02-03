@@ -32,7 +32,6 @@ This skill defines the high-level workflow for software development tasks, enfor
 1.  **Check In-Progress**: Are there tasks in `In-Progress`?
 2.  **Check Sub-agents**: Use `process action=list` to see if `claude` is still running.
 3.  **Action**:
-    - **Stuck**: If no output for >10m, kill and respawn/notify.
     - **Healthy**: Do nothing.
 
 ### Phase 3: Spec Generation (Delegate to Claude)
