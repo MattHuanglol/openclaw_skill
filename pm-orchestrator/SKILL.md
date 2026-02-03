@@ -26,12 +26,14 @@ This skill defines the high-level workflow for software development tasks, enfor
 2.  **Status Update**:
     - Move task to `In-Progress`.
     - `message action=send`: "🚀 開始執行任務：[Title] (UUID)"
+    - **Enable Patrol**: `openclaw cron enable --id c7438563-e00f-40f0-b7cb-6468e96efef7`
 
 ### Phase 2: Progress Monitoring (Heartbeat)
 **Trigger**: Periodic Kanban Check (e.g., every 5m).
 1.  **Check In-Progress**: Are there tasks in `In-Progress`?
 2.  **Check Sub-agents**: Use `process action=list` to see if `claude` is still running.
 3.  **Action**:
+    - **Stuck**: If no output for >10m, kill and respawn/notify.
     - **Healthy**: Do nothing.
 
 ### Phase 3: Spec Generation (Delegate to Claude)
@@ -67,6 +69,34 @@ openclaw sessions send --agent main --message "claude done: Implementation <feat
     - Update task status to `Review`.
     - Add a discussion comment summarizing the work.
 4.  **Report**: `message action=send` using the **Reporting Template** below.
+
+## ♾️ The Automation Loop
+
+This section defines the interaction between PM Agent, Claude, and the Patrol.
+
+### 1. 🚀 Start
+- **Trigger**: User adds task or PM picks `Todo`.
+- **Action**: 
+  - Move to `In-Progress`.
+  - Enable Patrol: `openclaw cron enable --id ...`
+  - Start Claude (Phase 2/5).
+
+### 2. 🛡️ Monitoring (Patrol)
+- **Running**: Patrol notifies User + PM ("✅ Running").
+- **Stuck (>1h)**: Patrol wakes PM ("🚨 Stuck").
+- **Done (Safety)**: Patrol wakes PM ("🕵️‍♀️ Found JSON").
+
+### 3. 🧠 Response (PM)
+- **On "Running"**: Check process. If active > 1h, **Touch** Kanban `updated_at` (Renewal).
+- **On "Stuck"**: Check process. If dead, **Resume** task.
+
+### 4. 🎉 Completion
+- **Trigger**: Claude finishes -> `sessions_send` to PM.
+- **Action**: PM Verifies -> PM Updates Kanban (Review) -> PM Notifies User (`message`).
+
+### 5. 🛑 Stop
+- **Trigger**: User moves to `Done`.
+- **Action**: Patrol sees empty list -> `cron disable`.
 
 ## ⚠️ Global Rules
 1.  **No Direct Coding**: Always delegate implementation to `claude-code`.
