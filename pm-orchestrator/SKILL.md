@@ -40,7 +40,7 @@ This skill defines the high-level workflow for software development tasks, enfor
 PM delegates to Claude:
 ```bash
 claude -p "Read proposal.md. Generate full specs (specs/*.md), design.md, and tasks.md following OpenSpec conventions." --output-format json && \
-openclaw sessions send --agent main --message "claude done: Spec Gen"
+openclaw agent --id main --message "claude done: Spec Gen"
 ```
 
 ### Phase 4: Spec Review & Auto-Implement (PM Gate)
@@ -53,11 +53,11 @@ openclaw sessions send --agent main --message "claude done: Spec Gen"
     -   If invalid: Stop and report issues.
 
 ### Phase 5: Implementation (Delegate to Claude)
-PM delegates to Claude (Dual Notification):
+PM delegates to Claude:
 ```bash
 claude -p "Implement the approved tasks defined in openspec/changes/<feature>/tasks.md. Update checklist as you go." --output-format json && \
 openclaw message send --target 894437982 --message "🔔 Claude Task Finished! Verifying..." && \
-openclaw sessions send --agent main --message "claude done: Implementation <feature>"
+openclaw agent --id main --message "claude done: Implementation <feature>"
 ```
 *(Agent goes to sleep and waits for this internal message)*
 
@@ -92,8 +92,8 @@ This section defines the interaction between PM Agent, Claude, and the Patrol.
 - **On "Stuck"**: Check process. If dead, **Resume** task.
 
 ### 4. 🎉 Completion
-- **Trigger**: Claude finishes -> `message` (User) + `sessions_send` (PM).
-- **Action**: PM Verifies -> PM Updates Kanban (Review) -> PM Notifies User (Final Report).
+- **Trigger**: Claude finishes -> `openclaw agent` to PM.
+- **Action**: PM Verifies -> PM Updates Kanban (Review) -> PM Notifies User (`message`).
 
 ### 5. 🛑 Stop
 - **Trigger**: User moves to `Done`.
@@ -103,7 +103,7 @@ This section defines the interaction between PM Agent, Claude, and the Patrol.
 1.  **No Direct Coding**: Always delegate implementation to `claude-code`.
 2.  **No Git Push**: Unless explicitly instructed.
 3.  **Always Update Kanban**: Status MUST reflect reality (Todo -> In-Progress -> Review).
-4.  **Wake Event**: Always use `openclaw sessions send` to ensure the Main Agent wakes up.
+4.  **Wake Event**: Always use `openclaw agent --id main --message` to wake up.
 
 ## 📝 Reporting Template
 🚀 **任務交付報告 (Task Delivery)**
