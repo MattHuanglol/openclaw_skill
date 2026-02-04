@@ -81,7 +81,8 @@ Monitoring is delegated to the dedicated **kanban-dev-monitor** skill (JS-only r
 - **Frequency**: every 5 minutes
 - **Noise policy**: alert only on **events / stuck / finish / service-down**
 - **Stuck threshold**: 30 minutes
-- **Action ownership**: monitor only wakes PM; **PM decides** corrective actions after wake.
+- **Closed-loop rule (Must)**: When the monitor wakes PM (tick/event), PM must **continue the workflow automatically** (restart stuck steps, re-run next phase via `claude_code_run.py`, verify, then push task to `Review` + write delivery summary).
+- **Action ownership**: monitor detects + wakes; **PM executes** the next corrective/progress action.
 
 ## ⚠️ Global Rules
 1.  **No Direct Coding**: Always delegate implementation to `claude-code`.

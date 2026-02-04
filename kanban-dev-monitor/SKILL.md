@@ -29,10 +29,12 @@ node /home/matt/clawd/skills/custom/kanban-dev-monitor/scripts/kanban_dev_monito
 ```
 
 ## Cron Contract
-Cron job should:
+Cron job should implement a **closed-loop**:
 1) Execute the JS runner.
-2) If runner exits non-zero or throws, wake PM with error summary.
-3) Otherwise stay silent.
+2) If runner detects an **event** (change/stuck/finish/service-down), it must wake PM.
+3) After PM is awake, PM must **continue the next step automatically** (e.g., re-run the next phase using `claude_code_run.py`, restart services, or push task to `Review` after verification).
+4) If runner exits non-zero or throws, wake PM with error summary.
+5) Otherwise stay silent.
 
 ## Config
 Environment variables supported by the runner:
