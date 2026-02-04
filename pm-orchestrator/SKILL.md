@@ -22,6 +22,7 @@ This skill defines the high-level workflow for software development tasks, enfor
   - **Planner**: Generates Specs/Design/Tasks based on Proposal.
   - **Coder**: Implements code using the `claude` CLI.
   - **Hard Requirement**: In PM mode, all implementation work must be delegated via the **claude-code skill** (i.e., `claude` CLI). PM does not directly implement application code unless the USER explicitly requests otherwise.
+  - **Execution Reliability (Must)**: For any single-shot `claude -p ...` work, run via the **PTY wrapper** from claude-code skill: `scripts/claude_code_run.py` (to reduce hangs/SIGKILL/no-output issues). Only use raw `claude` directly when running an interactive PTY session.
 
 ## 🔄 Execution Loop & Workflow
 
