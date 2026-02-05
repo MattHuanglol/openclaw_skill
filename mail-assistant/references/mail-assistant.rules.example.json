@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "important_unread": {
+    "enabled": true,
+    "folder": "INBOX",
+    "max_scan": 50,
+    "match_any": [
+      {
+        "name": "客戶/供應商重要信",
+        "enabled": true,
+        "from_contains": ["@xummit.com.tw", "@partner.example"],
+        "to_contains": [],
+        "subject_contains": ["緊急", "urgent", "action required"],
+        "body_contains": [],
+        "flags_required": [],
+        "flags_forbidden": ["Seen"]
+      }
+    ]
+  },
+  "daily_summary": {
+    "enabled": true,
+    "folder": "INBOX",
+    "top_n": 10,
+    "max_pages": 10,
+    "page_size": 50
+  }
+}
