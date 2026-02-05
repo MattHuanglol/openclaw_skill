@@ -20,6 +20,12 @@ import tempfile
 import os
 from pathlib import Path
 
+# Optional: Simplified -> Traditional conversion
+try:
+    from opencc import OpenCC
+except Exception:
+    OpenCC = None
+
 # Whisper venv location
 WHISPER_PYTHON = Path.home() / ".venvs" / "whisper" / "bin" / "python"
 WHISPER_BIN = Path.home() / ".venvs" / "whisper" / "bin" / "whisper"
@@ -129,6 +135,15 @@ def transcribe(audio_path: str, model: str = DEFAULT_MODEL) -> dict:
             # Extract text from segments
             text = whisper_output.get("text", "").strip()
             detected_lang = whisper_output.get("language", "zh")
+
+            # Convert to Traditional Chinese if possible
+            # (Whisper often outputs Simplified for zh)
+            if text and OpenCC is not None:
+                try:
+                    cc = OpenCC("s2t")
+                    text = cc.convert(text)
+                except Exception:
+                    pass
 
             # Calculate duration from segments if not available from ffprobe
             if seconds is None and "segments" in whisper_output:
