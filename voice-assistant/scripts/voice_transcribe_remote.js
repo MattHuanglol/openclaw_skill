@@ -70,11 +70,26 @@ function parseTranscriptFromResponseText(rawText) {
     const parsed = JSON.parse(t);
 
     // Response may be JSON string: "..."
-    if (typeof parsed === 'string') return parsed.trim();
+    if (typeof parsed === 'string') {
+      const s = parsed.trim();
+      // Some servers double-encode JSON (string that contains JSON).
+      try {
+        const parsed2 = JSON.parse(s);
+        if (parsed2 && typeof parsed2 === 'object') {
+          if (typeof parsed2.text === 'string') return parsed2.text.trim();
+          if (typeof parsed2.full_text === 'string') return parsed2.full_text.trim();
+          if (typeof parsed2.transcript === 'string') return parsed2.transcript.trim();
+          if (typeof parsed2.result === 'string') return parsed2.result.trim();
+          if (parsed2.result && typeof parsed2.result.text === 'string') return parsed2.result.text.trim();
+        }
+      } catch {}
+      return s;
+    }
 
     // Or JSON object: {text:"..."}
     if (parsed && typeof parsed === 'object') {
       if (typeof parsed.text === 'string') return parsed.text.trim();
+      if (typeof parsed.full_text === 'string') return parsed.full_text.trim();
       if (typeof parsed.transcript === 'string') return parsed.transcript.trim();
       if (typeof parsed.result === 'string') return parsed.result.trim();
       if (parsed.result && typeof parsed.result.text === 'string') return parsed.result.text.trim();
