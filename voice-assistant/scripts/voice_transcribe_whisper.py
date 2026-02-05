@@ -26,7 +26,7 @@ WHISPER_BIN = Path.home() / ".venvs" / "whisper" / "bin" / "whisper"
 
 # Model selection - use medium for better Traditional Chinese accuracy
 # Options: tiny, base, small, medium, large, large-v2, large-v3
-DEFAULT_MODEL = "medium"
+DEFAULT_MODEL = os.environ.get("WHISPER_MODEL", "base")
 
 
 def get_audio_duration(audio_path: str) -> float | None:
