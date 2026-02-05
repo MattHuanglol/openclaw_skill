@@ -51,7 +51,7 @@ node /home/matt/clawd/skills/custom/voice-assistant/scripts/voice_dedup.js --che
 ```bash
 GEMINI_API_KEY=your_api_key_here
 # Optional: override model
-GEMINI_STT_MODEL=gemini-2.0-flash
+GEMINI_STT_MODEL=gemini-2.5-flash
 ```
 
 **隱私提醒**：啟用 Gemini STT 時，語音內容會被上傳到 Google 的 API 進行處理。

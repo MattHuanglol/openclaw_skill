@@ -22,7 +22,7 @@ const { spawnSync } = require('child_process');
 const { getSecret } = require('./secrets');
 
 const GEMINI_API_KEY = getSecret('GEMINI_API_KEY');
-const GEMINI_MODEL = process.env.GEMINI_STT_MODEL || 'gemini-2.0-flash';
+const GEMINI_MODEL = process.env.GEMINI_STT_MODEL || 'gemini-2.5-flash';
 
 const FFMPEG_BIN = process.env.FFMPEG_BIN || path.join(__dirname, '..', '..', '..', '..', 'bin', 'ffmpeg');
 const FFPROBE_BIN = process.env.FFPROBE_BIN || path.join(__dirname, '..', '..', '..', '..', 'bin', 'ffprobe');
