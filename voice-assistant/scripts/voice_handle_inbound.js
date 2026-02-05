@@ -386,23 +386,30 @@ function main() {
     process.exit(1);
   }
 
-  // Use file-unique-id for dedup if available, otherwise message-id
-  const dedupId = args.fileUniqueId || args.messageId;
+  // Dedup IDs:
+  // - Prefer Telegram file_unique_id (stable across retries)
+  // - Also check/mark by inbound filename to avoid double-replies when both
+  //   a scanner (file-based) and a direct handler (file_unique_id-based) run.
+  const fileBasedId = `file:${path.basename(args.path)}`;
+  const primaryDedupId = args.fileUniqueId || args.messageId;
+  const dedupIds = Array.from(new Set([primaryDedupId, fileBasedId]));
+
   const requestId = generateRequestId(args.fileUniqueId, args.messageId);
 
   // Step 1: Check dedup (but don't mark yet)
-  const dedupResult = checkDedup(dedupId);
-
-  if (dedupResult.isDuplicate) {
-    console.log(JSON.stringify({
-      requestId,
-      transcript: dedupResult.existingTranscript,
-      isCommand: false,
-      draftCommand: null,
-      suggestedReplyText: '這則語音我已經處理過囉～',
-      isDuplicate: true,
-    }));
-    process.exit(0);
+  for (const did of dedupIds) {
+    const dedupResult = checkDedup(did);
+    if (dedupResult.isDuplicate) {
+      console.log(JSON.stringify({
+        requestId,
+        transcript: dedupResult.existingTranscript,
+        isCommand: false,
+        draftCommand: null,
+        suggestedReplyText: '這則語音我已經處理過囉～',
+        isDuplicate: true,
+      }));
+      process.exit(0);
+    }
   }
 
   // Step 2: Transcribe
@@ -424,7 +431,9 @@ function main() {
   const transcript = transcribeResult.text;
 
   // Step 3: Mark as processed (only after successful transcription)
-  markProcessed(dedupId, transcript);
+  for (const did of dedupIds) {
+    markProcessed(did, transcript);
+  }
 
   // Step 4: Parse command
   const { isCommand, draftCommand } = parseCommand(transcript);
