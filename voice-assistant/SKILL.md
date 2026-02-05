@@ -147,6 +147,75 @@ node scripts/voice_dedup.js --clean --max-age 48
 
 ---
 
+## 待確認草稿（Pending Drafts）
+
+### 狀態檔案
+`~/.clawd-voice-pending.json`
+
+當語音訊息被識別為指令（以「指令」開頭）且成功產生草稿時，系統會自動儲存待確認的草稿資料。
+
+### JSON 格式
+
+```json
+{
+  "pending": {
+    "<requestId>": {
+      "createdAt": "2026-02-05T10:30:00.000Z",
+      "messageId": "12345",
+      "fileUniqueId": "AgADxxxx",
+      "audioPath": "/tmp/voice_xxx.ogg",
+      "transcript": "指令 提醒我下午三點開會",
+      "draftCommand": "/remind 15:00 開會"
+    }
+  }
+}
+```
+
+### requestId 生成規則
+
+`requestId` 使用穩定的 hash 演算法：`sha256(fileUniqueId || messageId)` 取前 16 個 hex 字元。
+這確保同一則訊息的 requestId 永遠相同，可用於跨對話追蹤。
+
+---
+
+## 確認/取消/修改草稿（voice_confirm.js）
+
+### 腳本使用
+
+```bash
+# 執行草稿指令
+node scripts/voice_confirm.js --request-id <id> --action execute
+
+# 取消草稿
+node scripts/voice_confirm.js --request-id <id> --action cancel
+
+# 修改後執行
+node scripts/voice_confirm.js --request-id <id> --action modify --modify-text "/remind 16:00 開會"
+```
+
+### 輸出格式
+
+```json
+{
+  "ok": true,
+  "action": "execute",
+  "requestId": "abc123...",
+  "commandToExecute": "/remind 15:00 開會",
+  "transcript": "指令 提醒我下午三點開會"
+}
+```
+
+| 欄位 | 說明 |
+|------|------|
+| `ok` | 是否成功 |
+| `action` | 執行的動作（execute/cancel/modify） |
+| `requestId` | 請求 ID |
+| `commandToExecute` | 要執行的指令（cancel 時為 null） |
+| `transcript` | 原始轉寫文字 |
+| `error` | 錯誤訊息（僅在失敗時） |
+
+---
+
 ## 升級到 A+2（未來）
 
 - 低風險指令可自動執行；高風險仍需確認。
@@ -183,3 +252,33 @@ node scripts/voice_dedup.js --clean --max-age 48
 ### 6. Fallback 測試
 1. 發送語音但系統無法取得音檔
 2. 預期：收到「我有收到語音，但目前拿不到可轉寫的音檔/內容...」
+
+### 7. 待確認草稿測試
+1. 發送語音說「指令 提醒我明天早上九點開會」
+2. 確認 `~/.clawd-voice-pending.json` 有新紀錄
+3. 記下回傳的 `requestId`
+
+### 8. voice_confirm.js 測試
+
+```bash
+# 測試 execute
+node scripts/voice_confirm.js --request-id <id> --action execute
+# 預期：ok=true, commandToExecute 有值
+
+# 測試 cancel（需先重新產生一個待確認草稿）
+node scripts/voice_confirm.js --request-id <id> --action cancel
+# 預期：ok=true, commandToExecute=null
+
+# 測試 modify（需先重新產生一個待確認草稿）
+node scripts/voice_confirm.js --request-id <id> --action modify --modify-text "/remind 10:00 改時間"
+# 預期：ok=true, commandToExecute="/remind 10:00 改時間"
+
+# 測試無效 requestId
+node scripts/voice_confirm.js --request-id invalid123 --action execute
+# 預期：ok=false, error 提示找不到 pending draft
+```
+
+### 9. requestId 穩定性測試
+1. 對同一則語音訊息執行兩次 voice_handle_inbound.js（第二次會被 dedup 擋掉）
+2. 確認兩次回傳的 requestId 完全相同
+3. 這確保 requestId 可用於跨對話追蹤
