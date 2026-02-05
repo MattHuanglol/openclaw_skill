@@ -31,10 +31,15 @@ const take = lines.slice(0, MAX_ACTIONS);
 const rest = lines.slice(MAX_ACTIONS);
 
 const actions = [];
+const seen = new Set();
 for (const l of take) {
   try {
     const j = JSON.parse(l);
-    if (j && typeof j === 'object') actions.push(j);
+    if (!j || typeof j !== 'object') continue;
+    const key = `${j.requestId || ''}::${j.kind || ''}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    actions.push(j);
   } catch {}
 }
 

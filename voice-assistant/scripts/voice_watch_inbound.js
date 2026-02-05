@@ -22,7 +22,11 @@ const QUEUE_FILE = process.env.QUEUE_FILE || path.join(process.env.HOME || '/tmp
 const HANDLE = path.join(__dirname, 'voice_handle_inbound.js');
 
 const STABLE_MS = Number(process.env.STABLE_MS || 800);
+const DEBOUNCE_MS = Number(process.env.DEBOUNCE_MS || 2500);
 const ALLOWED_EXT = new Set(['.ogg', '.mp3', '.wav', '.m4a']);
+
+const DEDUP_STATE_FILE = path.join(process.env.HOME || '/tmp', '.clawd-voice-dedup.json');
+const recent = new Map(); // filename -> lastSeenMs
 
 function isAudioFile(filename) {
   const ext = path.extname(filename).toLowerCase();
@@ -35,6 +39,21 @@ function makeButtons(requestId) {
     { text: '✏️ 修改', callback_data: `voice_confirm:${requestId}:modify` },
     { text: '❌ 取消', callback_data: `voice_confirm:${requestId}:cancel` },
   ];
+}
+
+function loadDedupState() {
+  try {
+    if (fs.existsSync(DEDUP_STATE_FILE)) {
+      const j = JSON.parse(fs.readFileSync(DEDUP_STATE_FILE, 'utf8'));
+      return (j && typeof j === 'object') ? j : { processed: {} };
+    }
+  } catch {}
+  return { processed: {} };
+}
+
+function hasProcessed(dedupId) {
+  const st = loadDedupState();
+  return !!st?.processed?.[dedupId];
 }
 
 function enqueue(action) {
@@ -89,7 +108,18 @@ console.log(`queue: ${QUEUE_FILE}`);
 fs.watch(INBOUND_DIR, { persistent: true }, (eventType, filename) => {
   if (!filename) return;
   if (!isAudioFile(filename)) return;
+
+  const now = Date.now();
+  const last = recent.get(filename) || 0;
+  if (now - last < DEBOUNCE_MS) return;
+  recent.set(filename, now);
+
   const fullPath = path.join(INBOUND_DIR, filename);
+
+  // file-based dedup precheck (avoid double enqueue when fs.watch fires multiple times)
+  const fileBasedId = `file:${filename}`;
+  if (hasProcessed(fileBasedId)) return;
+
   waitStableThenHandle(fullPath);
 });
 
