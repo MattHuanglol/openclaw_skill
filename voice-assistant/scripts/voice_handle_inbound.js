@@ -34,10 +34,13 @@ const fs = require('fs');
 
 const SCRIPTS_DIR = __dirname;
 const DEDUP_SCRIPT = path.join(SCRIPTS_DIR, 'voice_dedup.js');
-const TRANSCRIBE_SCRIPT = path.join(SCRIPTS_DIR, 'voice_transcribe_whisper.py');
+const TRANSCRIBE_WHISPER_SCRIPT = path.join(SCRIPTS_DIR, 'voice_transcribe_whisper.py');
+const TRANSCRIBE_GEMINI_SCRIPT = path.join(SCRIPTS_DIR, 'voice_transcribe_gemini.js');
 const PENDING_STATE_FILE = path.join(process.env.HOME || '/tmp', '.clawd-voice-pending.json');
 
-// Use system python to run the whisper script (it will use the venv internally)
+const { getSecret } = require('./secrets');
+
+// Use whisper venv python to run the whisper/OpenCC scripts
 const PYTHON_BIN = process.env.HOME + '/.venvs/whisper/bin/python';
 
 /**
@@ -154,14 +157,25 @@ function markProcessed(dedupId, transcript) {
 }
 
 /**
- * Transcribe audio file using whisper
+ * Transcribe audio file.
+ * Prefers Gemini STT if GEMINI_API_KEY is present; otherwise falls back to local Whisper.
+ *
  * @returns {object} { text, lang, seconds, error? }
  */
 function transcribe(audioPath) {
+  const geminiKey = getSecret('GEMINI_API_KEY');
+  const useGemini = Boolean(geminiKey);
+
   try {
-    const result = spawnSync(PYTHON_BIN, [TRANSCRIBE_SCRIPT, audioPath], {
+    const cmd = useGemini ? 'node' : PYTHON_BIN;
+    const args = useGemini
+      ? [TRANSCRIBE_GEMINI_SCRIPT, audioPath]
+      : [TRANSCRIBE_WHISPER_SCRIPT, audioPath];
+
+    const result = spawnSync(cmd, args, {
       encoding: 'utf8',
       timeout: 600000, // 10 min timeout for long audio
+      env: process.env, // keep current env for model selection etc.
     });
 
     if (result.error) {
@@ -173,7 +187,7 @@ function transcribe(audioPath) {
       };
     }
 
-    const output = result.stdout.trim();
+    const output = (result.stdout || '').trim();
     if (!output) {
       return {
         text: null,
@@ -183,7 +197,20 @@ function transcribe(audioPath) {
       };
     }
 
-    return JSON.parse(output);
+    const parsed = JSON.parse(output);
+
+    // If Gemini fails for transient reasons, fall back to whisper once.
+    if (useGemini && (parsed.error || !parsed.text)) {
+      const fallback = spawnSync(PYTHON_BIN, [TRANSCRIBE_WHISPER_SCRIPT, audioPath], {
+        encoding: 'utf8',
+        timeout: 600000,
+        env: process.env,
+      });
+      const fbOut = (fallback.stdout || '').trim();
+      if (fbOut) return JSON.parse(fbOut);
+    }
+
+    return parsed;
   } catch (e) {
     return {
       text: null,

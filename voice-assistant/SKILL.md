@@ -40,6 +40,24 @@ node /home/matt/clawd/skills/custom/voice-assistant/scripts/voice_dedup.js --che
 
 ### Step 2: 轉寫
 
+#### Gemini STT（雲端，可選）
+若設定了 `GEMINI_API_KEY`，此 skill 會**優先**使用 Google AI Studio（Gemini）進行轉寫；否則回退到本機 Whisper。
+
+- 讀取順序：
+  1) `process.env.GEMINI_API_KEY`
+  2) `~/.openclaw/secrets.env`（`KEY=VALUE` 格式）
+
+`~/.openclaw/secrets.env` 範例：
+```bash
+GEMINI_API_KEY=your_api_key_here
+# Optional: override model
+GEMINI_STT_MODEL=gemini-2.0-flash
+```
+
+**隱私提醒**：啟用 Gemini STT 時，語音內容會被上傳到 Google 的 API 進行處理。
+
+---
+
 **優先使用 OpenClaw 的音訊理解能力（如果附件已被系統轉成可理解的內容）。**
 
 > **現實約束**：目前 OpenClaw 對 Telegram voice 的「附件→可供模型轉寫」形式，依 channel/設定而異。
@@ -224,6 +242,19 @@ node scripts/voice_confirm.js --request-id <id> --action modify --modify-text "/
 ---
 
 ## Test Plan（測試計畫）
+
+### 0. Smoke Test（本機檔案）
+```bash
+# Whisper（無 GEMINI_API_KEY 時）
+/home/matt/.venvs/whisper/bin/python \
+  /home/matt/clawd/skills/custom/voice-assistant/scripts/voice_transcribe_whisper.py \
+  /path/to/sample.ogg
+
+# Gemini（需要 GEMINI_API_KEY）
+GEMINI_API_KEY=... node \
+  /home/matt/clawd/skills/custom/voice-assistant/scripts/voice_transcribe_gemini.js \
+  /path/to/sample.ogg
+```
 
 ### 1. 基本轉寫測試
 1. 從 Telegram 發送一則語音訊息（說「測試語音」）
