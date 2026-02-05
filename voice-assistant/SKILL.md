@@ -40,8 +40,29 @@ node /home/matt/clawd/skills/custom/voice-assistant/scripts/voice_dedup.js --che
 
 ### Step 2: 轉寫
 
+#### Remote Faster-Whisper STT（自架雲端，可選）
+若設定了 `REMOTE_STT_URL`，此 skill 會**優先**使用遠端 Faster-Whisper 服務進行轉寫；若失敗或無文字，再回退到 Gemini（若有）→ 本機 Whisper。
+
+- 讀取順序（同 GEMINI）：
+  1) `process.env.REMOTE_STT_URL`
+  2) `~/.openclaw/secrets.env`
+
+必要參數：
+```bash
+REMOTE_STT_URL=http://100.114.182.68:8000/transcribe
+```
+
+Auth（若你的服務需要）：
+```bash
+REMOTE_STT_TOKEN=your_token_here
+# Optional (default: X-API-Key)
+REMOTE_STT_AUTH_HEADER=X-API-Key
+```
+
+**隱私提醒**：啟用遠端 STT 時，語音內容會上傳到你設定的遠端服務。
+
 #### Gemini STT（雲端，可選）
-若設定了 `GEMINI_API_KEY`，此 skill 會**優先**使用 Google AI Studio（Gemini）進行轉寫；否則回退到本機 Whisper。
+若設定了 `GEMINI_API_KEY`，此 skill 會在 Remote STT 失敗/未啟用時使用 Google AI Studio（Gemini）進行轉寫；否則回退到本機 Whisper。
 
 - 讀取順序：
   1) `process.env.GEMINI_API_KEY`
@@ -245,16 +266,30 @@ node scripts/voice_confirm.js --request-id <id> --action modify --modify-text "/
 
 ### 0. Smoke Test（本機檔案）
 ```bash
-# Whisper（無 GEMINI_API_KEY 時）
-/home/matt/.venvs/whisper/bin/python \
-  /home/matt/clawd/skills/custom/voice-assistant/scripts/voice_transcribe_whisper.py \
+# Remote Faster-Whisper（需要 REMOTE_STT_URL；可選 token）
+REMOTE_STT_URL=http://100.114.182.68:8000/transcribe \
+REMOTE_STT_TOKEN=... \
+node /home/matt/clawd/skills/custom/voice-assistant/scripts/voice_transcribe_remote.js \
   /path/to/sample.ogg
 
 # Gemini（需要 GEMINI_API_KEY）
 GEMINI_API_KEY=... node \
   /home/matt/clawd/skills/custom/voice-assistant/scripts/voice_transcribe_gemini.js \
   /path/to/sample.ogg
+
+# Whisper（fallback / 無 GEMINI_API_KEY 時）
+/home/matt/.venvs/whisper/bin/python \
+  /home/matt/clawd/skills/custom/voice-assistant/scripts/voice_transcribe_whisper.py \
+  /path/to/sample.ogg
+
+# Full chain（remote → gemini → local）
+REMOTE_STT_URL=http://100.114.182.68:8000/transcribe \
+GEMINI_API_KEY=... \
+node /home/matt/clawd/skills/custom/voice-assistant/scripts/voice_handle_inbound.js \
+  --path /path/to/sample.ogg --message-id 1
 ```
+
+預期：`suggestedReplyText` 最後一行會出現 `(STT: remote|gemini|local)`。
 
 ### 1. 基本轉寫測試
 1. 從 Telegram 發送一則語音訊息（說「測試語音」）

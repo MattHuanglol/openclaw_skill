@@ -36,6 +36,7 @@ const SCRIPTS_DIR = __dirname;
 const DEDUP_SCRIPT = path.join(SCRIPTS_DIR, 'voice_dedup.js');
 const TRANSCRIBE_WHISPER_SCRIPT = path.join(SCRIPTS_DIR, 'voice_transcribe_whisper.py');
 const TRANSCRIBE_GEMINI_SCRIPT = path.join(SCRIPTS_DIR, 'voice_transcribe_gemini.js');
+const TRANSCRIBE_REMOTE_SCRIPT = path.join(SCRIPTS_DIR, 'voice_transcribe_remote.js');
 const PENDING_STATE_FILE = path.join(process.env.HOME || '/tmp', '.clawd-voice-pending.json');
 
 const { getSecret } = require('./secrets');
@@ -158,64 +159,93 @@ function markProcessed(dedupId, transcript) {
 
 /**
  * Transcribe audio file.
- * Prefers Gemini STT if GEMINI_API_KEY is present; otherwise falls back to local Whisper.
+ * Preference chain:
+ *   1) Remote Faster-Whisper (if REMOTE_STT_URL is set)
+ *   2) Gemini STT (if GEMINI_API_KEY is present)
+ *   3) Local Whisper
  *
- * @returns {object} { text, lang, seconds, error? }
+ * @returns {object} { text, lang, seconds, backend, error? , sttError? }
  */
 function transcribe(audioPath) {
+  const remoteUrl = getSecret('REMOTE_STT_URL');
   const geminiKey = getSecret('GEMINI_API_KEY');
-  const useGemini = Boolean(geminiKey);
 
-  try {
-    const cmd = useGemini ? 'node' : PYTHON_BIN;
-    const args = useGemini
-      ? [TRANSCRIBE_GEMINI_SCRIPT, audioPath]
-      : [TRANSCRIBE_WHISPER_SCRIPT, audioPath];
+  const errors = [];
 
+  function runJson(cmd, args, backendLabel) {
     const result = spawnSync(cmd, args, {
       encoding: 'utf8',
       timeout: 600000, // 10 min timeout for long audio
-      env: process.env, // keep current env for model selection etc.
+      env: process.env,
     });
 
     if (result.error) {
-      return {
-        text: null,
-        lang: null,
-        seconds: null,
-        error: `Spawn error: ${result.error.message}`,
-      };
+      return { parsed: null, err: `Spawn error: ${result.error.message}`, backend: backendLabel };
     }
 
     const output = (result.stdout || '').trim();
     if (!output) {
+      const msg = `No output from transcription. stderr: ${(result.stderr || '').toString().trim()}`.trim();
+      return { parsed: null, err: msg, backend: backendLabel };
+    }
+
+    try {
+      const parsed = JSON.parse(output);
+      return { parsed, err: null, backend: backendLabel };
+    } catch (e) {
+      return { parsed: null, err: `Invalid JSON output: ${e.message}. Raw: ${output.slice(0, 200)}`, backend: backendLabel };
+    }
+  }
+
+  try {
+    // 1) Remote
+    if (remoteUrl) {
+      const r = runJson('node', [TRANSCRIBE_REMOTE_SCRIPT, audioPath], 'remote');
+      if (r.parsed && !r.parsed.error && r.parsed.text) {
+        return { ...r.parsed, backend: 'remote' };
+      }
+      errors.push(r.parsed?.error || r.err || 'Remote STT failed');
+    }
+
+    // 2) Gemini
+    if (geminiKey) {
+      const r = runJson('node', [TRANSCRIBE_GEMINI_SCRIPT, audioPath], 'gemini');
+      if (r.parsed && !r.parsed.error && r.parsed.text) {
+        return {
+          ...r.parsed,
+          backend: 'gemini',
+          ...(errors.length ? { sttError: errors.join(' | ') } : {}),
+        };
+      }
+      errors.push(r.parsed?.error || r.err || 'Gemini STT failed');
+    }
+
+    // 3) Local Whisper
+    const r = runJson(PYTHON_BIN, [TRANSCRIBE_WHISPER_SCRIPT, audioPath], 'local');
+    if (r.parsed && !r.parsed.error && r.parsed.text) {
       return {
-        text: null,
-        lang: null,
-        seconds: null,
-        error: `No output from transcription. stderr: ${result.stderr}`,
+        ...r.parsed,
+        backend: 'local',
+        ...(errors.length ? { sttError: errors.join(' | ') } : {}),
       };
     }
 
-    const parsed = JSON.parse(output);
-
-    // If Gemini fails for transient reasons, fall back to whisper once.
-    if (useGemini && (parsed.error || !parsed.text)) {
-      const fallback = spawnSync(PYTHON_BIN, [TRANSCRIBE_WHISPER_SCRIPT, audioPath], {
-        encoding: 'utf8',
-        timeout: 600000,
-        env: process.env,
-      });
-      const fbOut = (fallback.stdout || '').trim();
-      if (fbOut) return JSON.parse(fbOut);
-    }
-
-    return parsed;
+    // Total failure
+    const finalError = r.parsed?.error || r.err || 'Local whisper failed';
+    errors.push(finalError);
+    return {
+      text: null,
+      lang: null,
+      seconds: r.parsed?.seconds ?? null,
+      backend: 'local',
+      error: errors.join(' | '),
+    };
   } catch (e) {
     return {
       text: null,
       lang: null,
       seconds: null,
+      backend: null,
       error: `Transcription failed: ${e.message}`,
     };
   }
@@ -372,12 +402,15 @@ function parseReminderCommand(content) {
 /**
  * Format suggested reply text
  */
-function formatReplyText(transcript, isCommand, draftCommand) {
+function formatReplyText(transcript, isCommand, draftCommand, sttBackend) {
   let reply = `你剛剛說：\n「${transcript}」`;
 
   if (isCommand && draftCommand) {
     reply += `\n\n（草稿）${draftCommand}\n\n請確認：\n✅ 執行  ✏️ 修改  ❌ 取消`;
   }
+
+  // Always include STT backend info as a final line for debugging/ops.
+  reply += `\n\n(STT: ${sttBackend || 'unknown'})`;
 
   return reply;
 }
@@ -451,6 +484,8 @@ function main() {
       suggestedReplyText: '我有收到語音，但轉寫失敗。請稍後再試，或直接用文字輸入。',
       error: transcribeResult.error || 'No transcript produced',
       seconds: transcribeResult.seconds,
+      sttBackend: transcribeResult.backend || null,
+      sttError: transcribeResult.sttError || transcribeResult.error || null,
     }));
     process.exit(1);
   }
@@ -471,7 +506,7 @@ function main() {
   }
 
   // Step 6: Format reply
-  const suggestedReplyText = formatReplyText(transcript, isCommand, draftCommand);
+  const suggestedReplyText = formatReplyText(transcript, isCommand, draftCommand, transcribeResult.backend);
 
   // Output result
   const result = {
@@ -482,6 +517,8 @@ function main() {
     suggestedReplyText,
     lang: transcribeResult.lang,
     seconds: transcribeResult.seconds,
+    sttBackend: transcribeResult.backend || null,
+    sttError: transcribeResult.sttError || null,
   };
 
   console.log(JSON.stringify(result, null, 2));
