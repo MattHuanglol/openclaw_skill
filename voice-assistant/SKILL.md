@@ -299,6 +299,11 @@ node /home/matt/clawd/skills/custom/voice-assistant/scripts/voice_handle_inbound
 
 預期：`suggestedReplyText` 最後一行會出現 `(STT: remote|gemini|local)`。
 
+## Cron / 排程建議（避免吃到預設模型）
+如果你用 OpenClaw Cron 來跑 voice scan / queue flush（isolated jobs），建議在 cron job 的 `payload.model` **明確指定**要用的模型，避免未來 gateway/agent 預設模型變更造成成本或行為差異。
+
+目前這套系統採用：`google-gemini-cli/gemini-3-flash-preview` 作為 voice cron 的指定模型。
+
 ### 1. 基本轉寫測試
 1. 從 Telegram 發送一則語音訊息（說「測試語音」）
 2. 預期：收到回覆「你剛剛說：『測試語音』」
