@@ -37,9 +37,9 @@ This skill defines the high-level workflow for software development tasks, enfor
 - **Stuck threshold**: 30 minutes (PM decides actions after wake).
 
 ### Phase 3: Spec Generation (Delegate to Claude)
-PM delegates to Claude:
+PM delegates to Claude (MUST use `--dangerously-skip-permissions`):
 ```bash
-claude -p "Read proposal.md. Generate full specs (specs/*.md), design.md, and tasks.md following OpenSpec conventions." --output-format json && \
+claude -p "Read proposal.md. Generate full specs (specs/*.md), design.md, and tasks.md following OpenSpec conventions." --dangerously-skip-permissions --output-format json && \
 openclaw agent --id main --message "claude done: Spec Gen"
 ```
 
@@ -58,6 +58,7 @@ PM delegates to Claude (via **claude-code skill**). After completion, **wake PM*
 # Recommended (single-shot): use the PTY wrapper from claude-code skill
 python3 /home/matt/clawd/skills/custom/claude-code/scripts/claude_code_run.py \
   -p "Implement the approved tasks defined in openspec/changes/<feature>/tasks.md. Update checklist as you go." \
+  --dangerously-skip-permissions \
   --output-format json && \
 openclaw sessions send --agent main --message "claude done: Implementation <feature>"
 ```
@@ -74,26 +75,30 @@ openclaw sessions send --agent main --message "claude done: Implementation <feat
 
 ## ♾️ The Automation Loop
 
-## 👀 Monitoring (Multi-Task, Event-Driven)
+The **Kanban Dev Monitor** is the heartbeat of the loop.
 
-Monitoring is delegated to the dedicated **kanban-dev-monitor** skill (JS-only runner, Cron every 5m).
-
-- **Frequency**: every 5 minutes
-- **Noise policy**: alert only on **events / stuck / finish / service-down**
-- **Stuck threshold**: 30 minutes
-- **Closed-loop rule (Must)**: When the monitor wakes PM (tick/event), PM must **continue the workflow automatically** (restart stuck steps, re-run next phase via `claude_code_run.py`, verify, then push task to `Review` + write delivery summary).
-- **Action ownership**: monitor detects + wakes; **PM executes** the next corrective/progress action.
+- **Frequency**: every 5 minutes (via Cron).
+- **Event-Driven**: Wakes PM only on **events / stuck / finish / service-down**.
+- **Closed-Loop Rule (Must)**: When the monitor wakes PM (e.g., "stuck" or "task picked up"):
+  - PM must **continue the workflow automatically**.
+  - Example: If awakened by "stuck", PM must inspect logs, then restart Claude or fix the issue, then resume.
+  - Example: If awakened by "finish", PM must verify and move to Review.
+- **Action ownership**: Monitor detects + wakes; **PM executes** the next corrective/progress action.
 
 ## ⚠️ Global Rules
 1.  **No Direct Coding**: Always delegate implementation to `claude-code`.
-2.  **No Git Push**: Unless explicitly instructed.
-3.  **Always Update Kanban**: Status MUST reflect reality (Todo -> In-Progress -> Review).
-4.  **Auto-Proceed After User Approval**: Once the USER explicitly confirms “開始開發 / OK 開發 / 做吧”等同意開發的指令後，若未另行要求，**不需要再逐步詢問確認**（例如 Spec Review 後、開工前、每一步前）。PM 應直接依流程推進到完成（到 `Review` 階段並回報）。只有在遇到重大不確定性/風險（需求衝突、資料毀損風險、需對外行為、或可能破壞既有功能）時才中途詢問。
-5.  **Immediate Delivery Sync (Must)**: Once implementation + smoke test are completed, PM MUST immediately:
+2.  **Strict Permission Bypass**: Always add `--dangerously-skip-permissions` to Claude Code commands to prevent hanging on prompts.
+3.  **No Git Push**: Unless explicitly instructed.
+4.  **Auto-Proceed (Strict)**: Once the USER explicitly approves development (e.g., "OK開發/開始"), PM MUST **automatically proceed through all phases** (Spec -> Implement -> Review) without pausing to ask/report in between.
+    - **Do NOT stop** after Spec Gen; verify and launch Implementation immediately.
+    - **Do NOT stop** after Implementation; verify and move to Review immediately.
+    - **Only pause if:** high-risk, blockers, or user intervention is explicitly required.
+5.  **Always Update Kanban**: Status MUST reflect reality (Todo -> In-Progress -> Review).
+6.  **Immediate Delivery Sync (Must)**: Once implementation + smoke test are completed, PM MUST immediately:
     - Append a delivery summary + acceptance checklist to the task discussion, and
     - Move the task to **`Review`**.
     Do not wait for the user to ask for status.
-6.  **Wake Event**: Always use `openclaw agent --id main --message` to wake up.
+7.  **Wake Event**: Always use `openclaw agent --id main --message` to wake up.
 
 ## 📝 Reporting Template
 🚀 **任務交付報告 (Task Delivery)**

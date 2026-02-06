@@ -3,7 +3,12 @@
  * voice_handle_inbound.js
  *
  * Handler for inbound Telegram voice/audio messages.
- * Implements A+1 workflow: transcribe → reply with transcript → propose command draft if starts with "指令"
+ * Implements A+1 workflow: transcribe → reply with transcript → propose command draft.
+ *
+ * Supported voice prefixes:
+ *   - "指令 ..."     → commandType 'exec' (reminder flow)
+ *   - "點子：/想法：/Idea：..." → commandType 'idea' (save to Idea Bank)
+ *   - "任務：/Task：/新增任務：..." → commandType 'task' (create Kanban task)
  *
  * Usage:
  *   node voice_handle_inbound.js --path <audio_path> --message-id <id> [--file-unique-id <fuid>]
@@ -13,7 +18,8 @@
  *     "requestId": "...",
  *     "transcript": "...",
  *     "isCommand": true/false,
- *     "draftCommand": "/remind ..." or null,
+ *     "draftCommand": "/remind ..." or "/idea ..." or "/task ..." or null,
+ *     "commandType": "exec"|"idea"|"task"|null,
  *     "suggestedReplyText": "你剛剛說：\n「...」",
  *     "error": "..." (only on failure)
  *   }
@@ -22,7 +28,7 @@
  *   1. Check dedup using file-unique-id or message-id
  *   2. Transcribe using voice_transcribe_whisper.py
  *   3. Mark as processed (only after successful transcription)
- *   4. Parse for command intent if transcript starts with "指令"
+ *   4. Parse for command intent (idea/task/指令 prefixes)
  *   5. Return structured JSON result
  */
 
@@ -129,7 +135,7 @@ function savePendingState(state) {
 /**
  * Store a pending command draft for later confirmation
  */
-function storePendingDraft(requestId, messageId, fileUniqueId, audioPath, transcript, draftCommand) {
+function storePendingDraft(requestId, messageId, fileUniqueId, audioPath, transcript, draftCommand, commandType) {
   const state = loadPendingState();
   state.pending[requestId] = {
     createdAt: new Date().toISOString(),
@@ -138,6 +144,7 @@ function storePendingDraft(requestId, messageId, fileUniqueId, audioPath, transc
     audioPath,
     transcript,
     draftCommand,
+    commandType: commandType || 'exec',
   };
   savePendingState(state);
 }
@@ -252,19 +259,51 @@ function transcribe(audioPath) {
 }
 
 /**
- * Parse command from transcript if it starts with "指令"
- * Currently supports: reminders
+ * Parse command from transcript.
+ * Detects prefixes:
+ *   - 點子/想法/Idea → commandType 'idea'
+ *   - 任務/Task/新增任務 → commandType 'task'
+ *   - 指令 → commandType 'exec' (existing reminder flow)
  *
  * Examples:
- *   "指令 提醒我明天早上九點開會" → "/remind 09:00 開會"
- *   "指令 十分鐘後提醒我喝水" → "/remind +10m 喝水"
- *   "指令 提醒我下午三點去看醫生" → "/remind 15:00 去看醫生"
+ *   "點子：做一個自動澆水系統" → { type: '/idea', args: ['做一個自動澆水系統'], commandType: 'idea' }
+ *   "任務：修改登入頁面" → { type: '/task', args: ['修改登入頁面'], commandType: 'task' }
+ *   "指令 提醒我明天早上九點開會" → { type: '/exec', draftCommand: '/remind 09:00 開會', commandType: 'exec' }
  */
 function parseCommand(transcript) {
   const normalized = transcript.trim();
 
+  // Check for Idea prefix: 點子/想法/Idea
+  const ideaMatch = normalized.match(/^(?:點子|電子|想法|Idea)[:：]\s*(.+)/is);
+  if (ideaMatch) {
+    const content = ideaMatch[1].trim();
+    if (content) {
+      return {
+        isCommand: true,
+        commandType: 'idea',
+        draftCommand: `/idea ${content}`,
+        args: [content],
+      };
+    }
+  }
+
+  // Check for Task prefix: 任務/Task/新增任務
+  const taskMatch = normalized.match(/^(?:新增任務|任務|Task)[:：]\s*(.+)/is);
+  if (taskMatch) {
+    const content = taskMatch[1].trim();
+    if (content) {
+      return {
+        isCommand: true,
+        commandType: 'task',
+        draftCommand: `/task ${content}`,
+        args: [content],
+      };
+    }
+  }
+
+  // Existing: check for 指令 prefix
   if (!normalized.startsWith('指令')) {
-    return { isCommand: false, draftCommand: null };
+    return { isCommand: false, draftCommand: null, commandType: null };
   }
 
   // Remove "指令" prefix and extra whitespace
@@ -273,6 +312,7 @@ function parseCommand(transcript) {
   if (!content) {
     return {
       isCommand: true,
+      commandType: 'exec',
       draftCommand: null, // No content after keyword
     };
   }
@@ -283,6 +323,7 @@ function parseCommand(transcript) {
   if (reminderDraft) {
     return {
       isCommand: true,
+      commandType: 'exec',
       draftCommand: reminderDraft,
     };
   }
@@ -290,6 +331,7 @@ function parseCommand(transcript) {
   // Unknown command type - return the raw content as suggestion
   return {
     isCommand: true,
+    commandType: 'exec',
     draftCommand: `# 無法識別的指令: ${content}`,
   };
 }
@@ -498,11 +540,11 @@ function main() {
   }
 
   // Step 4: Parse command
-  const { isCommand, draftCommand } = parseCommand(transcript);
+  const { isCommand, draftCommand, commandType } = parseCommand(transcript);
 
   // Step 5: Store pending draft if this is a command with a draft
   if (isCommand && draftCommand) {
-    storePendingDraft(requestId, args.messageId, args.fileUniqueId, args.path, transcript, draftCommand);
+    storePendingDraft(requestId, args.messageId, args.fileUniqueId, args.path, transcript, draftCommand, commandType);
   }
 
   // Step 6: Format reply
@@ -514,6 +556,7 @@ function main() {
     transcript,
     isCommand,
     draftCommand,
+    commandType: commandType || null,
     suggestedReplyText,
     lang: transcribeResult.lang,
     seconds: transcribeResult.seconds,

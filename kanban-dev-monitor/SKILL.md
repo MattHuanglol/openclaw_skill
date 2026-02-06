@@ -13,10 +13,19 @@ A lightweight, **event-driven** monitor for Project Kanban development tasks.
   - status/version/open-subtasks changed
   - **stuck**: no progress for **>= 30 minutes**
   - Kanban server down
+  - **finish**: task leaves `in-progress`
 - Persists snapshots to:
   - `/home/matt/clawd/memory/kanban-monitor-state.json`
-- **Never** messages the user directly.
-- On events, **wake PM (main agent)** via `sessions_send`.
+
+### Deterministic automations (no LLM)
+- **Service down**: best-effort restart `project-kanban.service`, then retry once
+- **Stuck**: append a one-time discussion template per stuck episode
+- **Finish**: auto-move task to **Review** (never Done) and append an acceptance checklist
+
+### Notification policy
+- 平常不會直接通知使用者（避免刷屏）。
+- **任務完成（finish）事件**：會主動 Telegram 通知 Matt（且同時喚醒 PM）。
+- 其他事件：只喚醒 PM（main agent） via `sessions_send`。
 
 ## Execution (JS-only)
 The actual logic must be executed by the deterministic runner:
@@ -29,12 +38,18 @@ node /home/matt/clawd/skills/custom/kanban-dev-monitor/scripts/kanban_dev_monito
 ```
 
 ## Cron Contract
-Cron job should implement a **closed-loop**:
+Cron job should implement a **closed-loop** (and run as an **isolated agentTurn** so we can pin the model):
+
+- **sessionTarget:** `isolated`
+- **model:** `google-gemini-cli/gemini-3-flash-preview`
+
+Steps:
 1) Execute the JS runner.
-2) If runner detects an **event** (change/stuck/finish/service-down), it must wake PM.
-3) After PM is awake, PM must **continue the next step automatically** (e.g., re-run the next phase using `claude_code_run.py`, restart services, or push task to `Review` after verification).
-4) If runner exits non-zero or throws, wake PM with error summary.
-5) Otherwise stay silent.
+2) If runner detects an **event** (change/stuck/finish/service-down), it must wake PM (main session) via `sessions_send`.
+3) **If event is `finish`**: also proactively notify Matt on Telegram (one concise message, max 5 items).
+4) After PM is awake, PM must **continue the next step automatically** (e.g., re-run the next phase using `claude_code_run.py`, restart services, or push task to `Review` after verification).
+5) If runner exits non-zero or throws, wake PM with error summary.
+6) Otherwise stay silent (`NO_REPLY`).
 
 ## Config
 Environment variables supported by the runner:

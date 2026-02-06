@@ -8,6 +8,11 @@
  * This is a bridge until we have a first-class inbound hook for voice.
  * Intended to run via cron every 30–60s.
  *
+ * Confirmation buttons are context-aware based on commandType:
+ *   - 'idea' → "💡 儲存點子"
+ *   - 'task' → "📋 建立任務"
+ *   - default → "✅ 執行"
+ *
  * Output JSON:
  *   { ok:true, actions:[ { kind:'sendDraft', requestId, text, buttons } ... ] }
  * If nothing to do: { ok:true, actions:[] }
@@ -55,9 +60,16 @@ function listAudioFiles() {
   return files;
 }
 
-function makeButtons(requestId) {
+function makeButtons(requestId, commandType) {
+  let confirmLabel = '✅ 執行';
+  if (commandType === 'idea') {
+    confirmLabel = '💡 儲存點子';
+  } else if (commandType === 'task') {
+    confirmLabel = '📋 建立任務';
+  }
+
   return [
-    { text: '✅ 執行', callback_data: `voice_confirm:${requestId}:execute` },
+    { text: confirmLabel, callback_data: `voice_confirm:${requestId}:execute` },
     { text: '✏️ 修改', callback_data: `voice_confirm:${requestId}:modify` },
     { text: '❌ 取消', callback_data: `voice_confirm:${requestId}:cancel` },
   ];
@@ -113,7 +125,7 @@ function runHandle(audioPath, dedupId) {
         kind: 'sendText',
         requestId: handled.requestId,
         text: handled.suggestedReplyText,
-        buttons: handled.isCommand ? makeButtons(handled.requestId) : [],
+        buttons: handled.isCommand ? makeButtons(handled.requestId, handled.commandType) : [],
       });
     }
   }

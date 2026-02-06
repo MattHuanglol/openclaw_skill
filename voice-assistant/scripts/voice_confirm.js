@@ -184,6 +184,7 @@ function main() {
     action: args.action,
     requestId: args.requestId,
     commandToExecute,
+    commandType: entry.commandType || 'exec',
     transcript: entry.transcript,
   });
 

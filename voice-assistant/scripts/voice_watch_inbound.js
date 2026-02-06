@@ -33,9 +33,16 @@ function isAudioFile(filename) {
   return ALLOWED_EXT.has(ext);
 }
 
-function makeButtons(requestId) {
+function makeButtons(requestId, commandType) {
+  let confirmLabel = '✅ 執行';
+  if (commandType === 'idea') {
+    confirmLabel = '💡 儲存點子';
+  } else if (commandType === 'task') {
+    confirmLabel = '📋 建立任務';
+  }
+
   return [
-    { text: '✅ 執行', callback_data: `voice_confirm:${requestId}:execute` },
+    { text: confirmLabel, callback_data: `voice_confirm:${requestId}:execute` },
     { text: '✏️ 修改', callback_data: `voice_confirm:${requestId}:modify` },
     { text: '❌ 取消', callback_data: `voice_confirm:${requestId}:cancel` },
   ];
@@ -81,7 +88,7 @@ function handleFile(fullPath) {
       kind: 'sendText',
       requestId: handled.requestId || dedupId,
       text: handled.suggestedReplyText,
-      buttons: handled.isCommand ? makeButtons(handled.requestId) : [],
+      buttons: handled.isCommand ? makeButtons(handled.requestId, handled.commandType) : [],
     });
   }
 }

@@ -27,9 +27,19 @@ description: Store a pasted idea into Project Kanban 點子庫 (Idea Bank). Use 
   - `url`: if provided
   - `targetAudience`, `painPoints`, `status`: optional
 
+### 2.5) Auto-tag (deterministic)
+- After creating the idea, auto-suggest/apply tags by **referencing existing ideas** and their tags.
+- Goal: reduce manual tagging and keep the taxonomy consistent.
+- Control flags:
+  - `--tags "a,b,c"` to force-add tags
+  - `--no-auto-tags` to disable auto tagging
+  - `--max-auto-tags N` (default 7)
+
 ### 3) Add AI 評註 / 討論 (initial)
 After creating the idea, append an initial discussion entry via:
 - `POST /api/interests/:id/discussions`
+
+Note: the Kanban server currently auto-creates an initial AI template discussion on `POST /api/interests`. The runner should **avoid adding a duplicate** if that template already exists.
 
 Use the structured template:
 - 【我先理解的版本】
