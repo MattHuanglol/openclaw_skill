@@ -40,6 +40,14 @@ node /home/matt/clawd/skills/custom/voice-assistant/scripts/voice_dedup.js --che
 
 ### Step 2: 轉寫
 
+#### STT 優先序 / Fallback 規則（重要）
+此 skill 的 STT 會依以下順序自動選擇後端（失敗會自動回退）：
+1) **Remote Faster-Whisper**（若設定 `REMOTE_STT_URL`）
+2) **Gemini STT**（若設定 `GEMINI_API_KEY`）
+3) **本機 Whisper**（最後保底）
+
+每次回覆的最後一行會附上：`(STT: remote|gemini|local)`，方便主人確認本次實際使用的後端。
+
 #### Remote Faster-Whisper STT（自架雲端，可選）
 若設定了 `REMOTE_STT_URL`，此 skill 會**優先**使用遠端 Faster-Whisper 服務進行轉寫；若失敗或無文字，再回退到 Gemini（若有）→ 本機 Whisper。
 
