@@ -39,14 +39,12 @@ description: Store a pasted idea into Project Kanban 點子庫 (Idea Bank). Use 
 After creating the idea, append an initial discussion entry via:
 - `POST /api/interests/:id/discussions`
 
-Note: the Kanban server currently auto-creates an initial AI template discussion on `POST /api/interests`. The runner should **avoid adding a duplicate** if that template already exists.
+Note: the Kanban server does NOT auto-create template discussions. The agent should add ONE meaningful discussion entry with actual analysis (not a blank template).
 
-Use the structured template:
-- 【我先理解的版本】
-- 【亮點 / 可能價值】
-- 【風險 / 需要釐清】
-- 【建議下一步（最小可行）】
-- 【我想問你的問題】(1–3)
+Write a genuine AI 評註 with:
+- 對這個點子的看法和分析
+- 跟現有系統/能力的關聯
+- 建議的下一步行動
 
 ### 4) Reply back to the user
 Return:
