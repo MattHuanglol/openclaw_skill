@@ -169,7 +169,8 @@ function buildStuckTemplate(t) {
     `偵測到任務疑似卡住（>=${STUCK_MINUTES} 分鐘無更新）。`,
     '',
     '卡點/阻塞：',
-    '- （請填寫）',\n    '',
+    '- （請填寫）',
+    '',
     '下一步：',
     '- （請填寫：要拆子任務/要我協助查 log/要重跑 phase 等）'
   ];
@@ -192,7 +193,8 @@ function buildAcceptanceChecklist(t) {
 async function smokeTest(url, timeoutMs = 3000) {
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
-    if (res.ok) {\n      return { ok: true, status: res.status };
+    if (res.ok) {
+      return { ok: true, status: res.status };
     }
     return { ok: false, error: `HTTP ${res.status}` };
   } catch (e) {
@@ -220,7 +222,8 @@ async function smokeTest(url, timeoutMs = 3000) {
       try { sendToMain(msg); } catch {}
     } catch (e2) {
       const msg = `🚨 Kanban Dev Monitor: Kanban API unreachable (tried ${URLS.join(', ')}). Restart attempted (ok=${restartResult.ok}). Error: ${String(e2)}.`;
-      try { sendToMain(msg); } catch {}\n      writeState(state);
+      try { sendToMain(msg); } catch {}
+      writeState(state);
       process.exit(0);
     }
   }
@@ -293,7 +296,8 @@ async function smokeTest(url, timeoutMs = 3000) {
       const already = Number(state.stuckCommentAtMs?.[String(t.taskId)] || 0);
       if (!already) {
         try {
-          await patchTask(base, t.taskId, {\n            ifVersion: t.version,
+          await patchTask(base, t.taskId, {
+            ifVersion: t.version,
             patch: {
               discussionAppend: {
                 author: '妲己',
@@ -322,7 +326,7 @@ async function smokeTest(url, timeoutMs = 3000) {
           : '❌ 自動 Smoke Test 失敗 (服務無法連線)';
 
         const checklist = buildAcceptanceChecklist(t);
-        const combinedText = smokeLine + '\\n\\n' + checklist;
+        const combinedText = smokeLine + '\n\n' + checklist;
 
         // Never set to done. Ensure review unless archived.
         const patch = {
@@ -361,7 +365,8 @@ async function smokeTest(url, timeoutMs = 3000) {
     const out = {
       at: nowIso(),
       base,
-      events: events.map(e => ({\n        kind: e.kind,
+      events: events.map(e => ({
+        kind: e.kind,
         taskId: String(e.cur.taskId),
         seq: e.cur.seq,
         title: e.cur.title,
@@ -369,8 +374,9 @@ async function smokeTest(url, timeoutMs = 3000) {
         reasons: e.reasons || []
       }))
     };
-    process.stdout.write(JSON.stringify(out) + '\\n');
-  } catch {}\n
+    process.stdout.write(JSON.stringify(out) + '\n');
+  } catch {}
+
   // Group by taskId, prefer stuck over change; finish is separate.
   const grouped = new Map();
   for (const e of events) {
@@ -388,7 +394,9 @@ async function smokeTest(url, timeoutMs = 3000) {
       const t = finishEvt.cur;
       const smokeEmoji = finishEvt.smokeOk ? '✅' : '❌';
       const reasons = [...new Set((finishEvt.reasons || []))].join(', ');
-      const msg = `✅ Dev Monitor: Task #${t.seq}「${t.title}」完成（smoke: ${smokeEmoji}）。已移到 Review。（${reasons}）`;\n      try { sendToMain(msg); } catch {}\n      continue;
+      const msg = `✅ Dev Monitor: Task #${t.seq}「${t.title}」完成（smoke: ${smokeEmoji}）。已移到 Review。（${reasons}）`;
+      try { sendToMain(msg); } catch {}
+      continue;
     }
 
     if (stuckEvt) {
