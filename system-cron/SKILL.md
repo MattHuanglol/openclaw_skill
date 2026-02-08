@@ -30,6 +30,15 @@ OpenClaw 的 cron isolated session 執行時會佔住 `sessions.json.lock`（通
 
 # Kanban dev monitor (every 10 min)
 */10 * * * * /home/matt/clawd/skills/custom/kanban-dev-monitor/scripts/cron_wrapper.sh
+
+# AI News Brief (09:00 + 18:00) — needs agent, uses sessions send
+0 9,18 * * * /home/matt/clawd/skills/custom/system-cron/scripts/ai_news_wrapper.sh
+
+# Weekly AI Deep Brief (Sunday 20:00)
+0 20 * * 0 /home/matt/clawd/skills/custom/system-cron/scripts/weekly_brief_wrapper.sh
+
+# Weekly Stuck Analysis (Sunday 22:00)
+0 22 * * 0 /home/matt/clawd/skills/custom/system-cron/scripts/weekly_stuck_wrapper.sh
 ```
 
 Log 位置：
@@ -49,17 +58,7 @@ Wrapper 位置：
 - `/home/matt/clawd/skills/custom/mail-assistant/scripts/cron_wrapper.sh`
 - `/home/matt/clawd/skills/custom/kanban-dev-monitor/scripts/cron_wrapper.sh`
 
-## 仍在 OpenClaw cron 的 Jobs（低頻，需要 agent 能力）
-
-| Job | 頻率 | 原因 |
-|-----|------|------|
-| Daily AI News (1998dd19) | 09:00 & 18:00 | 需要 web_search tool |
-| Weekly AI Brief (2823154c) | 週日 20:00 | 需要 web_search tool |
-| Weekly Stuck Analysis (f674a679) | 週日 22:00 | 需要 exec + message tools |
-
-這些每天最多跑 2~3 次，lock 碰撞風險低，暫時保留。
-
-## 已停用的 OpenClaw cron Jobs
+## 已停用的 OpenClaw cron Jobs（全部）
 
 | Job ID | 名稱 | 停用原因 |
 |--------|------|---------|
@@ -70,6 +69,11 @@ Wrapper 位置：
 | 80ebd317 | Cron Health Watchdog | 監控對象都搬走了 |
 | 70dcf44b | Voice flush | 改事件驅動 (2026-02-08) |
 | 318d10f8 | Voice scan | 改事件驅動 (2026-02-08) |
+| 1998dd19 | Daily AI News | 改系統 crontab (sessions send) |
+| 2823154c | Weekly AI Brief | 改系統 crontab (sessions send) |
+| f674a679 | Weekly Stuck Analysis | 改系統 crontab |
+
+**結論：OpenClaw cron jobs 數量 = 0（全部停用）**
 
 ## 管理指令
 
