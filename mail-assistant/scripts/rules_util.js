@@ -8,7 +8,7 @@ function expandHome(p) {
 }
 
 function defaultRulesPath() {
-  return path.join(process.env.HOME || '', '.openclaw', 'mail-assistant.rules.json');
+  return path.join(__dirname, '..', 'mail-assistant.rules.json');
 }
 
 function loadRules(rulesPath) {

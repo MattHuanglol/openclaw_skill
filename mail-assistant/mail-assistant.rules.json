@@ -1,0 +1,34 @@
+{
+  "important_unread": {
+    "enabled": true,
+    "folder": "[Gmail]/全部郵件",
+    "max_scan": 100,
+    "match_any": [
+      {
+        "name": "GitHub Issues/PR",
+        "from_contains": ["github"]
+      },
+      {
+        "name": "Google 安全性快訊",
+        "subject_contains": ["安全性快訊"]
+      },
+      {
+        "name": "診所系統異常",
+        "from_contains": ["sainteir"],
+        "subject_contains": ["問題"]
+      },
+      {
+        "name": "Splashtop 漏洞警告",
+        "from_contains": ["splashtop"],
+        "subject_contains": ["Critical", "Vulnerability"]
+      }
+    ]
+  },
+  "daily_summary": {
+    "enabled": true,
+    "folder": "[Gmail]/全部郵件",
+    "top_n": 15,
+    "page_size": 50,
+    "max_pages": 3
+  }
+}
