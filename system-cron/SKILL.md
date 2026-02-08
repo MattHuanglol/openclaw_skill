@@ -31,14 +31,6 @@ OpenClaw 的 cron isolated session 執行時會佔住 `sessions.json.lock`（通
 # Kanban dev monitor (every 10 min)
 */10 * * * * /home/matt/clawd/skills/custom/kanban-dev-monitor/scripts/cron_wrapper.sh
 
-# AI News Brief (09:00 + 18:00) — needs agent, uses sessions send
-0 9,18 * * * /home/matt/clawd/skills/custom/system-cron/scripts/ai_news_wrapper.sh
-
-# Weekly AI Deep Brief (Sunday 20:00)
-0 20 * * 0 /home/matt/clawd/skills/custom/system-cron/scripts/weekly_brief_wrapper.sh
-
-# Weekly Stuck Analysis (Sunday 22:00)
-0 22 * * 0 /home/matt/clawd/skills/custom/system-cron/scripts/weekly_stuck_wrapper.sh
 ```
 
 Log 位置：
@@ -69,11 +61,18 @@ Wrapper 位置：
 | 80ebd317 | Cron Health Watchdog | 監控對象都搬走了 |
 | 70dcf44b | Voice flush | 改事件驅動 (2026-02-08) |
 | 318d10f8 | Voice scan | 改事件驅動 (2026-02-08) |
-| 1998dd19 | Daily AI News | 改系統 crontab (sessions send) |
-| 2823154c | Weekly AI Brief | 改系統 crontab (sessions send) |
-| f674a679 | Weekly Stuck Analysis | 改系統 crontab |
+| 70dcf44b | Voice flush | 改事件驅動 (2026-02-08) |
+| 318d10f8 | Voice scan | 改事件驅動 (2026-02-08) |
 
-**結論：OpenClaw cron jobs 數量 = 0（全部停用）**
+## 仍在 OpenClaw cron 的 Jobs（低頻，用 Gemini Flash）
+
+| Job ID | 名稱 | 頻率 | 模型 |
+|--------|------|------|------|
+| 1998dd19 | Daily AI News | 09:00 & 18:00 | gemini-3-flash |
+| 2823154c | Weekly AI Brief | 週日 20:00 | gemini-3-flash |
+| f674a679 | Weekly Stuck Analysis | 週日 22:00 | gemini-3-flash |
+
+這些需要 agent 能力（web_search / exec），且頻率低（每天最多 2 次），lock 碰撞風險可接受。
 
 ## 管理指令
 
