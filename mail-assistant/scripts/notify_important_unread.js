@@ -6,7 +6,7 @@
  * If rules missing/empty => print exactly: NO_REPLY
  */
 
-const { runHimalayaJson, formatEnvelopeRow } = require('./himalaya_util');
+const { runHimalaya, runHimalayaJson, formatEnvelopeRow } = require('./himalaya_util');
 const { loadRules, isEmptyRules, matchRule } = require('./rules_util');
 
 function parseArgs(argv) {
@@ -16,6 +16,7 @@ function parseArgs(argv) {
     if (a === '--account') out.account = argv[++i];
     else if (a === '--rules') out.rulesPath = argv[++i];
     else if (a === '--json') out.json = true;
+    else if (a === '--no-mark') out.noMark = true;
     else if (a === '--help' || a === '-h') out.help = true;
   }
   return out;
@@ -62,8 +63,23 @@ function main() {
     return;
   }
 
+  // Mark matched emails as seen (so they won't trigger again next check)
+  if (!args.noMark) {
+    for (const m of matches) {
+      try {
+        runHimalaya(
+          ['flag', 'add', '-a', args.account, '-f', folder, m.envelope.id, 'seen'],
+          { output: null }
+        );
+      } catch (e) {
+        // non-fatal: log but continue
+        process.stderr.write(`WARN: failed to mark ${m.envelope.id} as seen: ${e.message}\n`);
+      }
+    }
+  }
+
   if (args.json) {
-    console.log(JSON.stringify({ ok: true, rulesPath: path, folder, matches }, null, 2));
+    console.log(JSON.stringify({ ok: true, rulesPath: path, folder, matches, markedSeen: !args.noMark }, null, 2));
     return;
   }
 
@@ -75,6 +91,7 @@ function main() {
     const e = m.envelope;
     lines.push(`- [${e.id}] ${e.subject} | from: ${e.from} | date: ${e.date} | flags: ${e.flags} | rule: ${m.rule}`);
   }
+  if (!args.noMark) lines.push(`(已標記 ${matches.length} 封為已讀)`);
   console.log(lines.join('\n'));
 }
 
