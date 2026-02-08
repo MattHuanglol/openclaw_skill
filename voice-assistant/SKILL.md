@@ -5,6 +5,17 @@ description: Handle Telegram voice/audio messages as commands (STT) and send voi
 
 # Voice Assistant（Telegram 語音指令 + 語音通知）
 
+## ⚠️ 架構：事件驅動（非 Cron）
+
+**不使用 Cron 輪詢。** 收到語音訊息時，直接在 main session 當次 turn 處理。
+
+理由：Cron isolated sessions 搶 session lock，會導致 Telegram 訊息丟失。事件驅動零延遲、零 lock 衝突。
+
+### 觸發條件
+當 Telegram 訊息包含 **voice/audio 附件**（.ogg、.oga、.mp3、.m4a 等），立即走以下流程。
+
+---
+
 ## Scope（目前階段：A+1）
 
 - **STT（語音→文字）**：收到 Telegram 的 voice/audio 附件時
@@ -17,73 +28,62 @@ description: Handle Telegram voice/audio messages as commands (STT) and send voi
 
 ---
 
-## STT：語音指令（A+1）完整流程
+## STT：事件驅動完整流程
 
-### Step 0: 取得訊息識別碼（Dedup）
+### Step 0: 識別語音訊息
 
-從 Telegram 訊息取得唯一識別碼，優先順序：
-1. `file_unique_id`（voice/audio 附件的唯一 ID）
-2. `message_id`（訊息 ID）
+收到 Telegram 訊息時，檢查是否有語音/音訊附件：
+- 訊息中有提到 voice/audio file path（`~/.openclaw/media/inbound/` 下的 .ogg/.oga/.mp3/.m4a）
+- 若無音訊附件：不走本流程
 
-**檢查是否已處理過：**
+### Step 1: Dedup 檢查
+
+從訊息取得唯一識別碼（`file_unique_id` 或 `message_id`）：
+
 ```bash
 node /home/matt/clawd/skills/custom/voice-assistant/scripts/voice_dedup.js --check --id <ID>
 ```
 
-- 若 `duplicate: true`：回覆「這則語音我已經處理過囉～」，不重複轉寫。
-- 若 `duplicate: false`：繼續處理。
+- `duplicate: true`：回覆「這則語音我已經處理過囉～」，結束。
+- `duplicate: false`：繼續。
 
-### Step 1: 只處理 voice/audio
+### Step 2: 轉寫（直接在 main session exec）
 
-- 若訊息沒有 audio/voice 附件：不要走本流程。
-- 若是影片/圖片：忽略。
+```bash
+node /home/matt/clawd/skills/custom/voice-assistant/scripts/voice_handle_inbound.js \
+  --path <audio_file_path> --message-id <msg_id> [--file-unique-id <fuid>]
+```
 
-### Step 2: 轉寫
-
-#### STT 優先序 / Fallback 規則（重要）
-此 skill 的 STT 會依以下順序自動選擇後端（失敗會自動回退）：
+#### STT 優先序 / Fallback 規則
+自動選擇後端（失敗自動回退）：
 1) **Remote Faster-Whisper**（若設定 `REMOTE_STT_URL`）
 2) **Gemini STT**（若設定 `GEMINI_API_KEY`）
 3) **本機 Whisper**（最後保底）
 
-每次回覆的最後一行會附上：`(STT: remote|gemini|local)`，方便主人確認本次實際使用的後端。
+回覆最後一行附上：`(STT: remote|gemini|local)`
 
 #### Remote Faster-Whisper STT（自架雲端，可選）
-若設定了 `REMOTE_STT_URL`，此 skill 會**優先**使用遠端 Faster-Whisper 服務進行轉寫；若失敗或無文字，再回退到 Gemini（若有）→ 本機 Whisper。
+讀取順序：
+1) `process.env.REMOTE_STT_URL`
+2) `~/.openclaw/secrets.env`
 
-- 讀取順序（同 GEMINI）：
-  1) `process.env.REMOTE_STT_URL`
-  2) `~/.openclaw/secrets.env`
-
-必要參數：
 ```bash
 REMOTE_STT_URL=http://100.114.182.68:8000/transcribe
-```
-
-Auth（若你的服務需要）：
-```bash
 REMOTE_STT_TOKEN=your_token_here
-# Optional (default: X-API-Key)
-REMOTE_STT_AUTH_HEADER=X-API-Key
+REMOTE_STT_AUTH_HEADER=X-API-Key  # Optional, default: X-API-Key
 ```
-
-**隱私提醒**：啟用遠端 STT 時，語音內容會上傳到你設定的遠端服務。
 
 #### Gemini STT（雲端，可選）
-若設定了 `GEMINI_API_KEY`，此 skill 會在 Remote STT 失敗/未啟用時使用 Google AI Studio（Gemini）進行轉寫；否則回退到本機 Whisper。
+讀取順序：
+1) `process.env.GEMINI_API_KEY`
+2) `~/.openclaw/secrets.env`
 
-- 讀取順序：
-  1) `process.env.GEMINI_API_KEY`
-  2) `~/.openclaw/secrets.env`（`KEY=VALUE` 格式）
-
-`~/.openclaw/secrets.env` 範例：
 ```bash
 GEMINI_API_KEY=your_api_key_here
-# Optional: override model
-GEMINI_STT_MODEL=gemini-2.5-flash
+GEMINI_STT_MODEL=gemini-2.5-flash  # Optional
 ```
 
-**隱私提醒**：啟用 Gemini STT 時，語音內容會被上傳到 Google 的 API 進行處理。
+**隱私提醒**：Remote/Gemini STT 時語音內容會上傳到外部服務。
 
 ---
 
@@ -93,30 +93,32 @@ GEMINI_STT_MODEL=gemini-2.5-flash
 > 若本 turn 取不到可轉寫的內容，請回覆：
 > - "我有收到語音，但目前拿不到可轉寫的音檔/內容。請先貼文字，或稍後我幫你調整讓語音附件可轉寫。"
 
-### Step 3: 標記已處理 + 回覆轉寫
+### Step 3: 解析結果 + 回覆
 
-**標記為已處理：**
-```bash
-node /home/matt/clawd/skills/custom/voice-assistant/scripts/voice_dedup.js --mark --id <ID> --transcript "<轉寫文字>"
+`voice_handle_inbound.js` 輸出 JSON：
+```json
+{
+  "requestId": "...",
+  "transcript": "...",
+  "isCommand": true/false,
+  "draftCommand": "/remind ..." or null,
+  "commandType": "exec"|"idea"|"task"|null,
+  "suggestedReplyText": "你剛剛說：\n「...」"
+}
 ```
 
-**回覆模板：**
-```
-你剛剛說：
-「<transcript>」
-```
+**直接回覆** `suggestedReplyText` 給主人。
 
 ### Step 4: Command Mode（門檻：指令）
 
-只有當 `<transcript>` **以「指令」開頭**（可容許前後空白）時，才產生候選草稿。
+只有當 transcript **以「指令」開頭** 時，才產生候選草稿。
 
-**判斷邏輯：**
-```javascript
-const normalized = transcript.trim();
-const isCommand = normalized.startsWith('指令');
-```
+支援的語音前綴：
+- `指令 ...` → commandType `exec`
+- `點子：/想法：/Idea：...` → commandType `idea`
+- `任務：/Task：/新增任務：...` → commandType `task`
 
-**草稿格式（範例）：**
+**草稿格式：**
 ```
 （草稿）/remind 10:00 機車保養
 
@@ -124,142 +126,56 @@ const isCommand = normalized.startsWith('指令');
 ✅ 執行  ✏️ 修改  ❌ 取消
 ```
 
-### Step 5: 要求確認才執行（A+1）
+**若平台支援 inline buttons，優先用按鈕。** 按鈕的 callback_data 對應確認動作。
 
-- 直接請主人回覆：`執行` / `取消` / `修改：...`
-- **若平台支援 inline buttons，優先用按鈕：**
-  - ✅執行
-  - ✏️修改
-  - ❌取消
+### Step 5: 確認後執行（A+1）
 
-**等待確認後：**
-- `執行`：執行草稿指令
-- `取消`：取消，不執行
-- `修改：<new_command>`：用修改後的指令執行
+等待主人回覆：
+- `執行` / ✅按鈕：執行草稿指令
+- `取消` / ❌按鈕：取消
+- `修改：<new_command>` / ✏️按鈕：修改後執行
+
+確認腳本：
+```bash
+node /home/matt/clawd/skills/custom/voice-assistant/scripts/voice_confirm.js \
+  --request-id <id> --action execute|cancel|modify [--modify-text "..."]
+```
 
 ---
 
 ## TTS：語音通知（Telegram voice note）
 
-### 標準做法
-
 1. 呼叫 `tts(text)` 取得音檔路徑（MEDIA: ...）
-2. 用 `message` tool 發送語音：
+2. 用 `message` tool 發送：
    - `channel: telegram`
    - `target: 894437982`
    - `path: <MEDIA 路徑>`
    - `asVoice: true`
 
-### 文字內容建議
-
-- 先短句（可行動）：例如「提醒：機車保養」
-- 如有時間點：加上「你設定今天 10:00」
-
 ---
 
 ## 去重（Deduplication）
 
-### 狀態檔案
-`~/.clawd-voice-dedup.json`
-
-### 腳本使用
+狀態檔案：`~/.clawd-voice-dedup.json`
 
 ```bash
-# 檢查是否重複
-node scripts/voice_dedup.js --check --id <message_id|file_unique_id>
-# Exit code: 0 = 新訊息, 1 = 重複
-
-# 標記已處理
+# 檢查
+node scripts/voice_dedup.js --check --id <ID>
+# 標記
 node scripts/voice_dedup.js --mark --id <ID> --transcript "轉寫內容"
-
-# 列出所有已處理
+# 列出
 node scripts/voice_dedup.js --list
-
-# 清理舊紀錄（預設 24 小時）
+# 清理（預設 24h）
 node scripts/voice_dedup.js --clean --max-age 48
-```
-
-### JSON 格式
-
-```json
-{
-  "processed": {
-    "AgADxxxx": {
-      "processedAt": "2026-02-05T10:30:00.000Z",
-      "transcript": "指令 提醒我下午三點開會"
-    }
-  }
-}
 ```
 
 ---
 
 ## 待確認草稿（Pending Drafts）
 
-### 狀態檔案
-`~/.clawd-voice-pending.json`
+狀態檔案：`~/.clawd-voice-pending.json`
 
-當語音訊息被識別為指令（以「指令」開頭）且成功產生草稿時，系統會自動儲存待確認的草稿資料。
-
-### JSON 格式
-
-```json
-{
-  "pending": {
-    "<requestId>": {
-      "createdAt": "2026-02-05T10:30:00.000Z",
-      "messageId": "12345",
-      "fileUniqueId": "AgADxxxx",
-      "audioPath": "/tmp/voice_xxx.ogg",
-      "transcript": "指令 提醒我下午三點開會",
-      "draftCommand": "/remind 15:00 開會"
-    }
-  }
-}
-```
-
-### requestId 生成規則
-
-`requestId` 使用穩定的 hash 演算法：`sha256(fileUniqueId || messageId)` 取前 16 個 hex 字元。
-這確保同一則訊息的 requestId 永遠相同，可用於跨對話追蹤。
-
----
-
-## 確認/取消/修改草稿（voice_confirm.js）
-
-### 腳本使用
-
-```bash
-# 執行草稿指令
-node scripts/voice_confirm.js --request-id <id> --action execute
-
-# 取消草稿
-node scripts/voice_confirm.js --request-id <id> --action cancel
-
-# 修改後執行
-node scripts/voice_confirm.js --request-id <id> --action modify --modify-text "/remind 16:00 開會"
-```
-
-### 輸出格式
-
-```json
-{
-  "ok": true,
-  "action": "execute",
-  "requestId": "abc123...",
-  "commandToExecute": "/remind 15:00 開會",
-  "transcript": "指令 提醒我下午三點開會"
-}
-```
-
-| 欄位 | 說明 |
-|------|------|
-| `ok` | 是否成功 |
-| `action` | 執行的動作（execute/cancel/modify） |
-| `requestId` | 請求 ID |
-| `commandToExecute` | 要執行的指令（cancel 時為 null） |
-| `transcript` | 原始轉寫文字 |
-| `error` | 錯誤訊息（僅在失敗時） |
+requestId 生成：`sha256(fileUniqueId || messageId)` 取前 16 hex。
 
 ---
 
@@ -267,97 +183,3 @@ node scripts/voice_confirm.js --request-id <id> --action modify --modify-text "/
 
 - 低風險指令可自動執行；高風險仍需確認。
 - 仍建議保留 fallback：轉寫品質差就退回 A+1。
-
----
-
-## Test Plan（測試計畫）
-
-### 0. Smoke Test（本機檔案）
-```bash
-# Remote Faster-Whisper（需要 REMOTE_STT_URL；可選 token）
-REMOTE_STT_URL=http://100.114.182.68:8000/transcribe \
-REMOTE_STT_TOKEN=... \
-node /home/matt/clawd/skills/custom/voice-assistant/scripts/voice_transcribe_remote.js \
-  /path/to/sample.ogg
-
-# Gemini（需要 GEMINI_API_KEY）
-GEMINI_API_KEY=... node \
-  /home/matt/clawd/skills/custom/voice-assistant/scripts/voice_transcribe_gemini.js \
-  /path/to/sample.ogg
-
-# Whisper（fallback / 無 GEMINI_API_KEY 時）
-/home/matt/.venvs/whisper/bin/python \
-  /home/matt/clawd/skills/custom/voice-assistant/scripts/voice_transcribe_whisper.py \
-  /path/to/sample.ogg
-
-# Full chain（remote → gemini → local）
-REMOTE_STT_URL=http://100.114.182.68:8000/transcribe \
-GEMINI_API_KEY=... \
-node /home/matt/clawd/skills/custom/voice-assistant/scripts/voice_handle_inbound.js \
-  --path /path/to/sample.ogg --message-id 1
-```
-
-預期：`suggestedReplyText` 最後一行會出現 `(STT: remote|gemini|local)`。
-
-## Cron / 排程建議（避免吃到預設模型）
-如果你用 OpenClaw Cron 來跑 voice scan / queue flush（isolated jobs），建議在 cron job 的 `payload.model` **明確指定**要用的模型，避免未來 gateway/agent 預設模型變更造成成本或行為差異。
-
-目前這套系統採用：`google-gemini-cli/gemini-3-flash-preview` 作為 voice cron 的指定模型。
-
-### 1. 基本轉寫測試
-1. 從 Telegram 發送一則語音訊息（說「測試語音」）
-2. 預期：收到回覆「你剛剛說：『測試語音』」
-3. 確認 `~/.clawd-voice-dedup.json` 有新紀錄
-
-### 2. 重複訊息測試
-1. 手動觸發同一則語音的處理（模擬重試）
-2. 預期：收到「這則語音我已經處理過囉～」
-
-### 3. 指令模式測試
-1. 發送語音說「指令 提醒我明天早上九點開會」
-2. 預期：
-   - 收到轉寫文字
-   - 收到草稿：`（草稿）/remind 09:00 開會`
-   - 收到確認選項
-
-### 4. 非指令語音測試
-1. 發送語音說「今天天氣真好」
-2. 預期：只收到轉寫，不出現草稿/確認選項
-
-### 5. 確認執行測試
-1. 在草稿後回覆「執行」
-2. 預期：指令被執行
-
-### 6. Fallback 測試
-1. 發送語音但系統無法取得音檔
-2. 預期：收到「我有收到語音，但目前拿不到可轉寫的音檔/內容...」
-
-### 7. 待確認草稿測試
-1. 發送語音說「指令 提醒我明天早上九點開會」
-2. 確認 `~/.clawd-voice-pending.json` 有新紀錄
-3. 記下回傳的 `requestId`
-
-### 8. voice_confirm.js 測試
-
-```bash
-# 測試 execute
-node scripts/voice_confirm.js --request-id <id> --action execute
-# 預期：ok=true, commandToExecute 有值
-
-# 測試 cancel（需先重新產生一個待確認草稿）
-node scripts/voice_confirm.js --request-id <id> --action cancel
-# 預期：ok=true, commandToExecute=null
-
-# 測試 modify（需先重新產生一個待確認草稿）
-node scripts/voice_confirm.js --request-id <id> --action modify --modify-text "/remind 10:00 改時間"
-# 預期：ok=true, commandToExecute="/remind 10:00 改時間"
-
-# 測試無效 requestId
-node scripts/voice_confirm.js --request-id invalid123 --action execute
-# 預期：ok=false, error 提示找不到 pending draft
-```
-
-### 9. requestId 穩定性測試
-1. 對同一則語音訊息執行兩次 voice_handle_inbound.js（第二次會被 dedup 擋掉）
-2. 確認兩次回傳的 requestId 完全相同
-3. 這確保 requestId 可用於跨對話追蹤
